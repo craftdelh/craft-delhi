@@ -22,7 +22,7 @@ const webhookHandler = async (req, res) => {
             console.log('📦 NPM CI Output:', stdout1);
 
             // Step 3: PM2 restart
-            exec('pm2 restart server.js', (err2, stdout2, stderr2) => {
+            exec('pm2 restart server-craftdelhi', (err2, stdout2, stderr2) => {
                 if (err2) {
                     console.error('❌ PM2 restart failed:', err2);
                     return res.status(500).send('PM2 restart failed');
