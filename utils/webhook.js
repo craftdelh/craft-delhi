@@ -12,7 +12,7 @@ const webhookHandler = async (req, res) => {
 
         console.log('📥 Git Pull Output:', stdout);
 
-        // Step 2: Clean install (production-safe)
+        // Step 2: Clean install (production-safee)
         exec('npm ci', (err1, stdout1, stderr1) => {
             if (err1) {
                 console.error('❌ npm ci failed:', err1);
