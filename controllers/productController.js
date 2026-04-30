@@ -259,15 +259,15 @@ exports.getProducts = (req, res) => {
   });
 };
 
-exports.getProductsbyID = (req, res) => {
+exports.getProductsbySlug = (req, res) => {
   const id = req.user ? req.user.id : null;  
-  const { product_id } = req.params;
+  const { slug } = req.params;
 
-  if (!product_id) {
-    return res.status(400).json({ status: false, message: 'Product ID is required' });
+  if (!slug) {
+    return res.status(400).json({ status: false, message: 'Product slug is required' });
   }
 
-  productModel.getProductbyID(product_id, id, (err, product) => {
+  productModel.getProductbySlug(slug, id, (err, product) => {
     if (err) {
       console.error('DB Error:', err);
       return res.status(500).json({ status: false, message: 'Server error' });

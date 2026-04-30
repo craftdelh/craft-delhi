@@ -89,7 +89,7 @@ exports.getallProducts = (userId, callback) => {
   });
 };
 
-exports.getProductbyID = (productId, userId, callback) => {
+exports.getProductsbySlug = (slug, userId, callback) => {
   const sql = `
     SELECT 
       p.*,
@@ -131,10 +131,10 @@ exports.getProductbyID = (productId, userId, callback) => {
     LEFT JOIN seller_stores s ON s.seller_id = p.seller_id
     LEFT JOIN product_categories pc ON pc.id = p.category_id
 
-    WHERE p.id = ?;
+    WHERE p.product_sku = ?;
   `;
 
-  db.query(sql, [userId, productId], (err, results) => {
+  db.query(sql, [userId, slug], (err, results) => {
     if (err) return callback(err, null);
     return callback(null, results[0]);
   });
