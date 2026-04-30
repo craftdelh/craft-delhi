@@ -89,7 +89,7 @@ exports.getallProducts = (userId, callback) => {
   });
 };
 
-exports.getProductsbySlug = (slug, userId, callback) => {
+exports.getProductbySlug = (slug, userId, callback) => {
   const sql = `
     SELECT 
       p.*,
