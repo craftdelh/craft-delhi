@@ -95,6 +95,8 @@ exports.getProductbySlug = (slug, userId, callback) => {
       p.*,
       pc.name AS category_name,
       s.store_name,
+      s.store_username,
+      s.seller_id AS storeId,
 
       CASE 
         WHEN fp.id IS NOT NULL THEN TRUE 
