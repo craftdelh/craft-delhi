@@ -51,6 +51,7 @@ exports.createOrder = (req, res) => {
       payment_type,
       payment_method,
       payment_uid,
+      razorpay_order_id: null, // No razorpay order ID for direct/COD orders
       shipping_address_id,
       seller_id,
       buyer_note

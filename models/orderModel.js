@@ -10,10 +10,13 @@ exports.createOrder = (userId, data, callback) => {
     payment_type,
     payment_method,
     payment_uid,
+    razorpay_order_id,
     shipping_address_id,
     seller_id,
     buyer_note,
   } = data;
+
+  const status = Number(order_status);
 
   const orderQuery = `
     INSERT INTO order_details 
@@ -21,9 +24,11 @@ exports.createOrder = (userId, data, callback) => {
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `;
 
+  console.log('Inserting Order:', [order_uid, userId, total_amount, status]);
+
   db.query(
     orderQuery,
-    [order_uid, userId, total_amount, order_status, shipping_address_id, seller_id, buyer_note],
+    [order_uid, userId, total_amount, status, shipping_address_id, seller_id, buyer_note],
     (err, orderResult) => {
       if (err) return callback(err, null);
 
@@ -32,7 +37,7 @@ exports.createOrder = (userId, data, callback) => {
       // Call payment model instead of direct query
       Payment.createPayment(
         orderId,
-        { payment_uid, payment_type, payment_status, payment_method },
+        { payment_uid, razorpay_order_id, payment_type, payment_status, payment_method },
         (paymentErr, paymentResult) => {
           if (paymentErr) return callback(paymentErr, null);
 

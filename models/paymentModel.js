@@ -2,17 +2,21 @@
 const db = require("../config/db");
 
 exports.createPayment = (orderId, paymentData, callback) => {
-  const { payment_uid, payment_type, payment_status, payment_method } = paymentData;
+  const { payment_uid, razorpay_order_id, payment_type, payment_status, payment_method } = paymentData;
+
+  const status = Number(payment_status);
 
   const paymentQuery = `
     INSERT INTO payments 
-      (order_id, payment_uid, payment_type, payment_status, payment_method)
-    VALUES (?, ?, ?, ?, ?)
+      (order_id, payment_uid, razorpay_order_id, payment_type, payment_status, payment_method)
+    VALUES (?, ?, ?, ?, ?, ?)
   `;
+
+  console.log('Inserting Payment:', [orderId, payment_uid, razorpay_order_id, status]);
 
   db.query(
     paymentQuery,
-    [orderId, payment_uid, payment_type, payment_status, payment_method],
+    [orderId, payment_uid, razorpay_order_id, payment_type, status, payment_method],
     (err, result) => {
       if (err) return callback(err, null);
       callback(null, result);
