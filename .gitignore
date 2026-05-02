@@ -1,4 +1,4 @@
 node_modules
 .env
 test-dashboard.html
-package-lock.json
+test.html
