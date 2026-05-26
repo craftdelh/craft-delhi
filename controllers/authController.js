@@ -259,9 +259,44 @@ exports.register = (req, res) => {
             role: roleNum,
             gender
           },
-          (errUpdate) => {
+          async (errUpdate) => {
             if (errUpdate) {
               return res.status(500).json({ status: false, error: errUpdate });
+            }
+
+            try {
+              await sendEmail({
+                to: process.env.ADMIN_EMAIL,
+                subject: 'New Seller Registration Request - Craft Delhi',
+                title: 'New Seller Approval Request',
+                message: `
+                  Hello Admin,<br><br>
+
+                  A new seller has registered on <b>Craft Delhi</b> and is awaiting approval.<br><br>
+
+                  <b>User Details:</b><br>
+                  Name: ${first_name} ${last_name}<br>
+                  Email: ${email}<br>
+                  Phone: ${phone_number}<br>
+                  Gender: ${gender}<br>
+                  DOB: ${dob}<br><br>
+
+                  Please review and approve/reject this seller from the admin panel.<br><br>
+
+                  Regards,<br>
+                  <b>Craft Delhi System</b>
+                `,
+                text: `
+                  New seller registration request.
+
+                  Name: ${first_name} ${last_name}
+                  Email: ${email}
+                  Phone: ${phone_number}
+                `,
+              });
+
+            } catch (mailErr) {
+              console.error('Admin approval email failed:', mailErr);
             }
 
             return res.status(201).json({
