@@ -185,11 +185,29 @@ exports.getSaleSummary = (sellerId, callback) => {
 };
 exports.getAllProductsForSeller = (seller_id, callback) => {
   const sql = `
-    SELECT p.*,
-      pc.name AS category_name
+    SELECT
+        p.*,
+
+        CASE
+            WHEN c.parent_id IS NULL THEN c.name
+            ELSE parent.name
+        END AS category_name,
+
+        CASE
+            WHEN c.parent_id IS NULL THEN NULL
+            ELSE c.name
+        END AS subcat_name
+
     FROM products p
-    LEFT JOIN product_categories pc ON pc.id = p.category_id
+
+    LEFT JOIN product_categories c
+        ON c.id = p.category_id
+
+    LEFT JOIN product_categories parent
+        ON parent.id = c.parent_id
+
     WHERE p.seller_id = ?
+
     ORDER BY p.created_at DESC
   `;
   db.query(sql, [seller_id], callback);
