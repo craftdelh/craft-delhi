@@ -453,7 +453,18 @@ exports.getOrdersInvoiceById = (order_id, callback) => {
       ot.tracking_link,
       ot.estimated_delivery_from,
       ot.estimated_delivery_to,
-      ot.status AS tracking_status
+      ot.status AS tracking_status,
+      -- 🟢 Seller/Store Details
+      od.seller_id,
+      ss.store_name AS seller_store_name,
+      ss.business_number AS seller_business_number,
+      sd.office_address AS seller_office_address,
+      sd.home_address AS seller_home_address,
+      sd.city AS seller_city,
+      su.email AS seller_email,
+      su.phone_number AS seller_phone_number,
+      su.first_name AS seller_first_name,
+      su.last_name AS seller_last_name
     FROM order_details od
     LEFT JOIN order_items oi ON oi.order_id = od.id
     LEFT JOIN users u ON u.id = od.user_id
@@ -461,6 +472,10 @@ exports.getOrdersInvoiceById = (order_id, callback) => {
     LEFT JOIN user_addresses ua ON ua.id = od.shipping_address_id
     LEFT JOIN payments pay ON pay.order_id = od.id
     LEFT JOIN order_tracking ot ON ot.order_id = od.id
+    -- 🟢 Joins for Seller
+    LEFT JOIN users su ON su.id = od.seller_id
+    LEFT JOIN seller_stores ss ON ss.seller_id = od.seller_id
+    LEFT JOIN seller_details sd ON sd.user_id = od.seller_id
     WHERE od.id = ?
     ORDER BY od.created_at DESC
   `;
@@ -493,7 +508,17 @@ exports.getOrdersInvoiceById = (order_id, callback) => {
           buyer_note: row.buyer_note,
           created_at: row.created_at,
           items: [],
-          tracking_info: hasTracking
+          tracking_info: hasTracking,
+          // 🟢 Seller store details
+          seller_id: row.seller_id,
+          seller_store_name: row.seller_store_name,
+          seller_business_number: row.seller_business_number,
+          seller_office_address: row.seller_office_address,
+          seller_home_address: row.seller_home_address,
+          seller_city: row.seller_city,
+          seller_email: row.seller_email,
+          seller_phone_number: row.seller_phone_number,
+          seller_name: `${row.seller_first_name || ''} ${row.seller_last_name || ''}`.trim()
         };
 
         // 🟢 Only add tracking_details when exists

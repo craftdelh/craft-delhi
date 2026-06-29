@@ -369,7 +369,12 @@ exports.getOrderInvoice = (req, res) => {
         }
 
         // Generate & download PDF
-        generateInvoicePDF(orderData[0], res);
+        generateInvoicePDF(orderData[0], res).catch(pdfError => {
+          console.error("Error generating invoice PDF:", pdfError);
+          if (!res.headersSent) {
+            res.status(500).json({ status: false, message: 'Error generating PDF invoice' });
+          }
+        });
       });
     }
   );
