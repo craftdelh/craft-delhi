@@ -15,7 +15,7 @@ const orderTrackingRoutes = require('./routes/orderTrackingRoutes');
 const reviewsRoutes = require('./routes/reviewsRoutes');
 const giftCategories = require('./routes/giftCategoriesRoutes');
 const searchRoutes = require('./routes/SearchRoutes');
-
+const customOrderRoutes = require('./routes/customOrderRoutes');
 
 
 const app = express();
@@ -35,6 +35,7 @@ app.use('/api/order', orders);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/order-tracking', orderTrackingRoutes);
 app.use('/api/reviews', reviewsRoutes);
+app.use('/api/custom-orders', customOrderRoutes);
 app.use('/api/gift-categories', giftCategories);
 app.use('/api/searchall', searchRoutes);
 

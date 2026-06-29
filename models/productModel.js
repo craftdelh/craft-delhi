@@ -35,6 +35,7 @@ exports.getallProducts = (userId, callback) => {
       p.price, 
       s.store_name,
       s.store_username,
+      s.slug,
 
       -- favourite flag
       CASE 
@@ -97,6 +98,7 @@ exports.getProductbySlug = (slug, userId, callback) => {
       s.store_name,
       s.store_username,
       s.seller_id AS storeId,
+      s.slug,
 
       CASE 
         WHEN fp.id IS NOT NULL THEN TRUE 
