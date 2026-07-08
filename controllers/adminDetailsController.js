@@ -1,4 +1,5 @@
 const adminModel = require('../models/adminModel');
+const Settlement = require('../models/settlementModel');
 require('dotenv').config();
 const { uploadToS3, getS3KeyFromUrl } = require('../utils/s3Uploader');
 const { deleteFilesFromS3 } = require('../utils/deleteFilesFromS3');
@@ -926,4 +927,30 @@ exports.deleteBanner = async (req, res) => {
     });
   }
 };
+
+exports.getAdminSettlements = (req, res) => {
+  const role = req.user.role;
+
+  if (role != process.env.Admin_role_id) {
+    return res.status(403).json({ success: false, message: 'Unauthorized' });
+  }
+
+  Settlement.getSettlementsForAdmin((err, settlements) => {
+    if (err) {
+      console.error('Error fetching settlements for admin:', err);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch settlements',
+        error: err
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      total_records: settlements.length,
+      data: settlements
+    });
+  });
+};
+
 

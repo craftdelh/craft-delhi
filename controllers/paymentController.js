@@ -1,4 +1,5 @@
 const Payment = require('../models/paymentModel');
+const Settlement = require('../models/settlementModel');
 
 exports.getselleryPaymentSummary = (req, res) => {
   const sellerId = req.user?.id;
@@ -54,3 +55,28 @@ exports.getselleryPaymentHistory = (req, res) => {
     });
   });
 };
+
+exports.getsellerySettlements = (req, res) => {
+  const sellerId = req.user?.id;
+
+  if (req.user.role !== 2) {
+    return res.status(403).json({ status: false, message: 'Only sellers can access store settlements.' });
+  }
+
+  if (!sellerId || isNaN(sellerId)) {
+    return res.status(400).json({ status: false, message: 'Invalid seller ID' });
+  }
+
+  Settlement.getSettlementsBySellerId(sellerId, (err, settlements) => {
+    if (err) {
+      console.error('MySQL error:', err);
+      return res.status(500).json({ status: false, message: 'Internal server error' });
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: 'Settlements fetched successfully.',
+      data: settlements
+    });
+  });
+};

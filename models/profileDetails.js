@@ -207,28 +207,23 @@ exports.createBankDetails = (userId, callback) => {
 
 // 3. Update bank details
 exports.updateBankDetails = (userId, updateData, callback) => {
-  const {
-    bank_name,
-    branch_location,
-    account_holder_name,
-    account_number,
-    ifsc_code
-  } = updateData;
+  const fields = [];
+  const values = [];
 
-  const sql = `
-    UPDATE users_bank_details
-    SET bank_name = ?, branch_location = ?, account_holder_name = ?, account_number = ?, ifsc_code = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE user_id = ?
-  `;
+  for (let key in updateData) {
+    if (updateData[key] !== undefined) {
+      fields.push(`${key} = ?`);
+      values.push(updateData[key]);
+    }
+  }
 
-  db.query(sql, [
-    bank_name,
-    branch_location,
-    account_holder_name,
-    account_number,
-    ifsc_code,
-    userId
-  ], (err, result) => {
+  if (fields.length === 0) return callback(null, { affectedRows: 0 });
+
+  fields.push('updated_at = CURRENT_TIMESTAMP');
+  const sql = `UPDATE users_bank_details SET ${fields.join(', ')} WHERE user_id = ?`;
+  values.push(userId);
+
+  db.query(sql, values, (err, result) => {
     if (err) return callback(err);
     callback(null, result);
   });
@@ -252,7 +247,9 @@ exports.getBankDetails = (userId, callback) => {
       UBD.branch_location,
       UBD.account_holder_name,
       UBD.account_number,    
-      UBD.ifsc_code
+      UBD.ifsc_code,
+      UBD.razorpay_contact_id,
+      UBD.razorpay_fund_account_id
     FROM users_bank_details UBD
     WHERE UBD.user_id = ?
     LIMIT 1;

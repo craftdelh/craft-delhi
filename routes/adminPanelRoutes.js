@@ -76,4 +76,5 @@ router.put(
   ]),
   adminController.updateBanner
 );
+router.get('/settlements', verifyTokenforactions, adminController.getAdminSettlements);
 module.exports = router;

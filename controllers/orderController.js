@@ -3,6 +3,7 @@ const authorizeAction = require('../utils/authorizeAction');
 const OrderTracking = require('../models/orderTrackingModel');
 const {handleOrderAndTrackingUpdate, updateOrderStatusOnly, markOrderAsCancelled} = require('../utils/updateUtils');
 const {generateInvoicePDF} = require('../utils/invoiceGenerator');
+const settlementService = require('../utils/settlementService');
 
 // ✅ Create Order
 exports.createOrder = (req, res) => {
@@ -70,6 +71,9 @@ exports.createOrder = (req, res) => {
           console.error("Order Items Error:", itemErr);
           return res.status(500).json({ status: false, message: "Failed to insert order items" });
         }
+
+        // Trigger settlement process if online and paid
+        settlementService.triggerSettlementIfOnline(orderId, seller_id, total_amount, payment_status, payment_type);
 
         // ✅ Fetch full order details after creation
         Order.getOrderById(orderId, userId, (fetchErr, newOrder) => {

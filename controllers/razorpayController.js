@@ -1,6 +1,7 @@
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const Order = require('../models/orderModel');
+const settlementService = require('../utils/settlementService');
 require('dotenv').config();
 
 const razorpay = new Razorpay({
@@ -104,6 +105,9 @@ exports.verifyRazorpayPayment = async (req, res) => {
           console.error("Order Items Error after Razorpay verification:", itemErr);
           return res.status(500).json({ status: false, message: "Payment verified but failed to insert order items" });
         }
+
+        // Trigger settlement process
+        settlementService.triggerSettlementIfOnline(orderId, seller_id, total_amount, 1, 'Online');
 
         Order.getOrderById(orderId, userId, (fetchErr, newOrder) => {
           if (fetchErr) {

@@ -212,6 +212,8 @@ exports.updateBankDetails = async (req, res) => {
         }
 
         try {
+          const { razorpay_contact_id, razorpay_fund_account_id } = req.body;
+
           const updateData = {
             bank_name,
             branch_location,
@@ -219,6 +221,21 @@ exports.updateBankDetails = async (req, res) => {
             account_number,
             ifsc_code
           };
+
+          // Reset fund account cache if bank details changed
+          if (existingDetails && (
+            existingDetails.account_number !== account_number ||
+            existingDetails.ifsc_code !== ifsc_code ||
+            existingDetails.account_holder_name !== account_holder_name
+          )) {
+            updateData.razorpay_fund_account_id = null;
+          } else if (razorpay_fund_account_id !== undefined) {
+            updateData.razorpay_fund_account_id = razorpay_fund_account_id;
+          }
+
+          if (razorpay_contact_id !== undefined) {
+            updateData.razorpay_contact_id = razorpay_contact_id;
+          }
 
           // Perform the update
           profileDetails.updateBankDetails(userId, updateData, (updateErr, result) => {
