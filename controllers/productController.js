@@ -285,6 +285,31 @@ exports.getProductsbySlug = (req, res) => {
   });
 };
 
+exports.getProductRecommendations = (req, res) => {
+  const { slug } = req.params;
+  const requestedLimit = Number.parseInt(req.query.limit, 10);
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(Math.max(requestedLimit, 1), 12)
+    : 8;
+
+  if (!slug) {
+    return res.status(400).json({ status: false, message: 'Product slug is required' });
+  }
+
+  productModel.getRecommendationsBySlug(slug, limit, (err, products) => {
+    if (err) {
+      console.error('Recommendation DB Error:', err);
+      return res.status(500).json({ status: false, message: 'Failed to fetch recommendations' });
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: 'Product recommendations fetched successfully',
+      data: products
+    });
+  });
+};
+
 exports.updateProduct = async (req, res) => {
   const { product_id } = req.params;
   const userId = req.user?.id;
@@ -512,4 +537,3 @@ async function updateStatusOnly(product_id, status, res) {
     return res.status(500).json({ status: false, message: 'Error updating status' });
   }
 }
-

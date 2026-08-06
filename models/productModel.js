@@ -144,6 +144,88 @@ exports.getProductbySlug = (slug, userId, callback) => {
   });
 };
 
+exports.getRecommendationsBySlug = (slug, limit, callback) => {
+  const safeLimit = Math.min(Math.max(Number.parseInt(limit, 10) || 8, 1), 12);
+  const sql = `
+    SELECT
+      candidate.id,
+      candidate.seller_id AS storeId,
+      candidate.name,
+      candidate.product_sku,
+      candidate.description,
+      candidate.category_id,
+      candidate.stock,
+      candidate.main_image_url,
+      candidate.gallery_images,
+      candidate.price,
+      candidate.created_at,
+      category.name AS category_name,
+      category.parent_id AS parent_category_id,
+      store.store_name,
+      store.store_username,
+      COALESCE(review_stats.total_review, 0) AS total_review,
+      COALESCE(review_stats.average_rating, 0) AS average_rating,
+      COALESCE(order_stats.total_order, 0) AS total_order,
+      ROUND(
+        CASE
+          WHEN candidate.category_id = current_product.category_id THEN 120
+          WHEN COALESCE(category.parent_id, category.id) =
+               COALESCE(current_category.parent_id, current_category.id) THEN 70
+          ELSE 0
+        END
+        + GREATEST(
+            0,
+            30 - (
+              ABS(CAST(candidate.price AS DECIMAL(12, 2)) - CAST(current_product.price AS DECIMAL(12, 2)))
+              / GREATEST(CAST(current_product.price AS DECIMAL(12, 2)), 1)
+            ) * 30
+          )
+        + LEAST(COALESCE(review_stats.average_rating, 0) * 4, 20)
+        + LEAST(COALESCE(order_stats.total_order, 0), 20)
+        + GREATEST(0, 10 - (DATEDIFF(NOW(), candidate.created_at) / 30)),
+        2
+      ) AS recommendation_score
+    FROM products current_product
+    JOIN product_categories current_category
+      ON current_category.id = current_product.category_id
+    JOIN products candidate
+      ON candidate.id <> current_product.id
+    JOIN product_categories category
+      ON category.id = candidate.category_id
+    LEFT JOIN seller_stores store
+      ON store.seller_id = candidate.seller_id
+    LEFT JOIN (
+      SELECT
+        target_id,
+        COUNT(*) AS total_review,
+        ROUND(AVG(rating), 1) AS average_rating
+      FROM reviews
+      WHERE type = 'product'
+      GROUP BY target_id
+    ) review_stats ON review_stats.target_id = candidate.id
+    LEFT JOIN (
+      SELECT product_id, COUNT(*) AS total_order
+      FROM order_items
+      GROUP BY product_id
+    ) order_stats ON order_stats.product_id = candidate.id
+    WHERE current_product.product_sku = ?
+      AND candidate.admin_approval = 1
+      AND candidate.status = 1
+      AND COALESCE(candidate.stock, 0) > 0
+    ORDER BY
+      recommendation_score DESC,
+      total_order DESC,
+      average_rating DESC,
+      candidate.created_at DESC
+    LIMIT ?
+  `;
+
+  db.query(sql, [slug, safeLimit], (err, results) => {
+    if (err) return callback(err, null);
+    return callback(null, results);
+  });
+};
+
 
 exports.getProductbyIDforVerify = (productId, callback) => {
   const sql = `
