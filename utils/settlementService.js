@@ -5,24 +5,26 @@ const Settlement = require('../models/settlementModel');
 // Helper to make HTTPS requests to Razorpay API
 const makeRazorpayRequest = (path, method, body = null) => {
   return new Promise((resolve, reject) => {
-    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-      return reject(new Error('Razorpay API keys not configured in environment'));
+    const keyId = process.env.RAZORPAY_KEY_ID;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+
+    if (!keyId || !keySecret) {
+      return reject(new Error('Razorpay Key ID or Secret not configured in environment variables'));
     }
 
-    const auth = Buffer.from(`${process.env.RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`).toString('base64');
-    
+    const auth = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
     const options = {
       hostname: 'api.razorpay.com',
       port: 443,
       path: path,
       method: method,
       headers: {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${auth}`
       }
     };
 
-    console.log(`[RazorpayX API] Sending request ${method} ${path}`);
+    console.log(`[Razorpay API] Sending request ${method} https://api.razorpay.com${path}`);
 
     const req = https.request(options, (res) => {
       let data = '';
@@ -36,14 +38,14 @@ const makeRazorpayRequest = (path, method, body = null) => {
           if (res.statusCode >= 200 && res.statusCode < 300) {
             resolve(parsedData);
           } else {
-            console.error(`[RazorpayX API Error] Status ${res.statusCode}:`, parsedData);
+            console.error(`[Razorpay API Error] Status ${res.statusCode}:`, parsedData);
             reject({
               statusCode: res.statusCode,
-              error: parsedData.error || parsedData
+              error: parsedData.error ? parsedData.error.description || parsedData.error : parsedData
             });
           }
         } catch (e) {
-          console.error(`[RazorpayX API Parse Error] Status ${res.statusCode}:`, data);
+          console.error(`[Razorpay API Parse Error] Status ${res.statusCode}:`, data);
           reject({
             statusCode: res.statusCode,
             error: data || e.message
@@ -53,12 +55,12 @@ const makeRazorpayRequest = (path, method, body = null) => {
     });
 
     req.on('error', (e) => {
-      console.error('[RazorpayX API Connection Error]:', e);
+      console.error('[Razorpay API Connection Error]:', e);
       reject(e);
     });
 
     if (body) {
-      req.write(JSON.stringify(body));
+      req.write(typeof body === 'string' ? body : JSON.stringify(body));
     }
     req.end();
   });
@@ -114,62 +116,14 @@ const updateSellerBankDetailsIds = (userId, contactId, fundAccountId) => {
   });
 };
 
-// Find existing contact in Razorpay by reference_id if creation fails
-const findExistingContact = async (sellerId) => {
-  try {
-    const response = await makeRazorpayRequest(`/v1/contacts?reference_id=${sellerId}`, 'GET');
-    if (response && response.items && response.items.length > 0) {
-      return response.items[0];
-    }
-    return null;
-  } catch (error) {
-    console.error(`[RazorpayX] Failed to find existing contact for seller ${sellerId}:`, error);
-    return null;
-  }
-};
-
-// Get or Create RazorpayX Contact
-const getOrCreateContact = async (seller) => {
-  try {
-    console.log(`[RazorpayX] Creating contact for seller: ${seller.first_name} ${seller.last_name}`);
-    const body = {
-      name: `${seller.first_name} ${seller.last_name}`.trim() || `Seller ${seller.id}`,
-      email: seller.email || `seller${seller.id}@craftdelhi.com`,
-      contact: seller.phone_number ? seller.phone_number.replace(/[^0-9]/g, '').slice(-10) : '9999999999',
-      type: 'vendor',
-      reference_id: String(seller.id)
-    };
-    const response = await makeRazorpayRequest('/v1/contacts', 'POST', body);
-    return response;
-  } catch (error) {
-    // If contact already exists, search for it
-    if (error.statusCode === 400 || (error.error && error.error.description && error.error.description.includes('already exists'))) {
-      console.log(`[RazorpayX] Contact already exists for seller ${seller.id}. Searching...`);
-      const existing = await findExistingContact(seller.id);
-      if (existing) return existing;
-    }
-    throw error;
-  }
-};
-
-// Get or Create RazorpayX Fund Account
-const getOrCreateFundAccount = async (contactId, bankDetails) => {
-  console.log(`[RazorpayX] Creating fund account for contact ${contactId}`);
-  const body = {
-    contact_id: contactId,
-    account_type: 'bank_account',
-    bank_account: {
-      name: bankDetails.account_holder_name || 'Seller Account',
-      ifsc: bankDetails.ifsc_code,
-      account_number: bankDetails.account_number
-    }
-  };
-  const response = await makeRazorpayRequest('/v1/fund_accounts', 'POST', body);
-  return response;
-};
-
 // Main settlement processing entrypoint
 exports.processSettlement = async (orderId, sellerId, totalAmount) => {
+  // Check if settlement process is enabled (currently ON HOLD)
+  if (process.env.ENABLE_SETTLEMENT_PROCESS !== 'true') {
+    console.log(`[Settlement Service] [ON HOLD] Razorpay settlement process is currently ON HOLD. Skipping settlement for Order #${orderId}`);
+    return;
+  }
+
   console.log(`[Settlement Service] Starting settlement for Order #${orderId}, Seller #${sellerId}, Amount: ${totalAmount}`);
 
   // 1. Calculate commission
@@ -203,7 +157,7 @@ exports.processSettlement = async (orderId, sellerId, totalAmount) => {
 
     if (!enableRealPayouts) {
       // --- SIMULATION MODE ---
-      console.log(`[Settlement Service] [SIMULATION] Simulating payout of INR ${settlementAmount} to account ${bankDetails.account_number}`);
+      console.log(`[Settlement Service] [SIMULATION] Simulating Razorpay payout of INR ${settlementAmount} to account ${bankDetails.account_number}`);
       payoutStatus = 'completed';
       razorpayPayoutId = `pout_sim_${Date.now()}`;
       razorpayContactId = razorpayContactId || `cont_sim_${Date.now()}`;
@@ -212,54 +166,83 @@ exports.processSettlement = async (orderId, sellerId, totalAmount) => {
       // Update cache in database for simulation
       await updateSellerBankDetailsIds(sellerId, razorpayContactId, razorpayFundAccountId);
     } else {
-      // --- REAL RAZORPAYX MODE ---
+      // --- REAL RAZORPAYX PAYOUTS MODE ---
       if (!process.env.RAZORPAYX_ACCOUNT_NUMBER) {
         throw new Error('RAZORPAYX_ACCOUNT_NUMBER is not set in environment variables');
       }
 
-      // Step A: Contact
+      // Step A: Create Contact if not already present
       if (!razorpayContactId) {
-        const contact = await getOrCreateContact(seller);
-        razorpayContactId = contact.id;
-        await updateSellerBankDetailsIds(sellerId, razorpayContactId, null);
+        console.log(`[RazorpayX] Creating contact for Seller #${sellerId}`);
+        const sellerName = `${seller.first_name || ''} ${seller.last_name || ''}`.trim() || `Seller ${seller.id}`;
+        const contactBody = {
+          name: sellerName,
+          email: seller.email || `seller${seller.id}@craftdelhi.com`,
+          contact: seller.phone_number ? seller.phone_number.replace(/[^0-9]/g, '').slice(-10) : '9999999999',
+          type: 'vendor',
+          reference_id: `seller_${sellerId}`
+        };
+
+        const contactRes = await makeRazorpayRequest('/v1/contacts', 'POST', contactBody);
+        razorpayContactId = contactRes.id;
       }
 
-      // Step B: Fund Account
+      // Step B: Create Fund Account if not already present
       if (!razorpayFundAccountId) {
-        const fundAccount = await getOrCreateFundAccount(razorpayContactId, bankDetails);
-        razorpayFundAccountId = fundAccount.id;
-        await updateSellerBankDetailsIds(sellerId, null, razorpayFundAccountId);
+        console.log(`[RazorpayX] Creating fund account for Seller #${sellerId}`);
+        const accountHolderName = bankDetails.account_holder_name || `${seller.first_name || ''} ${seller.last_name || ''}`.trim() || `Seller ${seller.id}`;
+        const fundAccountBody = {
+          contact_id: razorpayContactId,
+          account_type: 'bank_account',
+          bank_account: {
+            name: accountHolderName,
+            ifsc: bankDetails.ifsc_code,
+            account_number: bankDetails.account_number
+          }
+        };
+
+        const fundAccountRes = await makeRazorpayRequest('/v1/fund_accounts', 'POST', fundAccountBody);
+        razorpayFundAccountId = fundAccountRes.id;
       }
 
-      // Step C: Payout
+      // Update contact & fund account IDs in DB
+      await updateSellerBankDetailsIds(sellerId, razorpayContactId, razorpayFundAccountId);
+
+      // Step C: Dispatch Payout
       console.log(`[RazorpayX] Dispatching payout of INR ${settlementAmount} to fund account ${razorpayFundAccountId}`);
+      
+      const payoutAmountPaise = Math.round(settlementAmount * 100);
+      const merchantRefId = `setl_${orderId}_${Date.now()}`;
+
       const payoutBody = {
         account_number: process.env.RAZORPAYX_ACCOUNT_NUMBER,
         fund_account_id: razorpayFundAccountId,
-        amount: Math.round(settlementAmount * 100), // in paise
+        amount: payoutAmountPaise,
         currency: 'INR',
         mode: 'IMPS',
-        purpose: 'vendor bill',
+        purpose: 'payout',
         queue_if_low_balance: true,
-        reference_id: String(orderId)
+        reference_id: merchantRefId
       };
 
-      const payout = await makeRazorpayRequest('/v1/payouts', 'POST', payoutBody);
-      razorpayPayoutId = payout.id;
-      // Map Razorpay payout status to our internal status
-      if (payout.status === 'processing' || payout.status === 'processed') {
+      const payoutRes = await makeRazorpayRequest('/v1/payouts', 'POST', payoutBody);
+      razorpayPayoutId = payoutRes.id;
+
+      const resStatus = payoutRes.status; // e.g. processing, processed, queued, failed
+      if (resStatus === 'processed') {
         payoutStatus = 'completed';
-      } else if (payout.status === 'reversed' || payout.status === 'failed') {
+      } else if (resStatus === 'failed') {
         payoutStatus = 'failed';
-        failureReason = payout.failure_reason || `Razorpay status: ${payout.status}`;
+        failureReason = payoutRes.status_details ? payoutRes.status_details.reason : 'Razorpay Payout failed';
       } else {
         payoutStatus = 'processing';
       }
     }
   } catch (error) {
-    console.error(`[Settlement Service Error] Failed to process settlement for Order #${orderId}:`, error.message || error);
+    const errorMsg = error.error ? (typeof error.error === 'string' ? error.error : JSON.stringify(error.error)) : (error.message || JSON.stringify(error));
+    console.error(`[Settlement Service Error] Failed to process settlement for Order #${orderId}:`, errorMsg);
     payoutStatus = 'failed';
-    failureReason = error.message || JSON.stringify(error);
+    failureReason = errorMsg;
   }
 
   // 2. Create the settlement record in the database
@@ -277,17 +260,26 @@ exports.processSettlement = async (orderId, sellerId, totalAmount) => {
     failure_reason: failureReason
   };
 
-  Settlement.createSettlement(settlementRecord, (err, result) => {
-    if (err) {
-      console.error(`[Settlement Service DB Error] Failed to save settlement record for Order #${orderId}:`, err);
-    } else {
-      console.log(`[Settlement Service] Settlement record saved successfully. ID: ${result.insertId}`);
-    }
+  await new Promise((resolve) => {
+    Settlement.createSettlement(settlementRecord, (err, result) => {
+      if (err) {
+        console.error(`[Settlement Service DB Error] Failed to save settlement record for Order #${orderId}:`, err);
+      } else {
+        console.log(`[Settlement Service] Settlement record saved successfully. ID: ${result.insertId}`);
+      }
+      resolve();
+    });
   });
 };
 
 // Check if payment is paid and online, then trigger settlement
 exports.triggerSettlementIfOnline = (orderId, sellerId, totalAmount, paymentStatus, paymentType) => {
+  // Check if settlement process is enabled (currently ON HOLD)
+  if (process.env.ENABLE_SETTLEMENT_PROCESS !== 'true') {
+    console.log(`[Settlement Service] [ON HOLD] Razorpay settlement process is currently ON HOLD. Skipping settlement trigger for Order #${orderId}`);
+    return;
+  }
+
   // paymentStatus 1 = Paid
   // paymentType 'Online' = Online payment directly to Admin account
   const isPaid = Number(paymentStatus) === 1;

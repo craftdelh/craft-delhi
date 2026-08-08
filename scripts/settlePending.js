@@ -1,7 +1,13 @@
+require('dotenv').config();
 const db = require('../config/db');
 const settlementService = require('../utils/settlementService');
 
 const retryFailedSettlements = async () => {
+  if (process.env.ENABLE_SETTLEMENT_PROCESS !== 'true') {
+    console.log('[Settlement Service] [ON HOLD] Settlement process is currently ON HOLD. Exiting retry script.');
+    process.exit(0);
+  }
+
   console.log('--- STARTING RETRY OF FAILED/PENDING SETTLEMENTS ---');
   
   // Find all failed or pending settlements

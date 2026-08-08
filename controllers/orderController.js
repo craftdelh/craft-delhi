@@ -52,7 +52,7 @@ exports.createOrder = (req, res) => {
       payment_type,
       payment_method,
       payment_uid,
-      razorpay_order_id: null, // No razorpay order ID for direct/COD orders
+      razorpay_order_id: null, // No Razorpay order ID for direct/COD orders
       shipping_address_id,
       seller_id,
       buyer_note
@@ -72,7 +72,7 @@ exports.createOrder = (req, res) => {
           return res.status(500).json({ status: false, message: "Failed to insert order items" });
         }
 
-        // Trigger settlement process if online and paid
+        // Trigger settlement process if online and paid (Currently ON HOLD via ENABLE_SETTLEMENT_PROCESS=false)
         settlementService.triggerSettlementIfOnline(orderId, seller_id, total_amount, payment_status, payment_type);
 
         // ✅ Fetch full order details after creation
