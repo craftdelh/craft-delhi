@@ -25,6 +25,7 @@ router.post(
   verifyTokenforactions, productController.addProduct
 );
 router.get('/get' ,productController.getProducts);
+router.get('/recommendations/:slug', productController.getProductRecommendations);
 router.get('/getbyslug/:slug' ,productController.getProductsbySlug);
 router.delete('/delete/:product_id',verifyTokenforactions  ,productController.deleteProduct);
 router.put(
