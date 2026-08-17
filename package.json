@@ -4,7 +4,8 @@
   "main": "index.js",
   "scripts": {
     "test": "node --test",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "migrate:category-slug": "node scripts/migrate_category_slug.js"
   },
   "keywords": [],
   "author": "",

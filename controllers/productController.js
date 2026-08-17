@@ -141,11 +141,10 @@ exports.addProduct = async (req, res) => {
       finalPrice = isNaN(num) ? 0 : num - 1;
     }
 
-    // Generate SKU
+    // Generate SKU/Slug from product name and timestamp
     const timestamp = Date.now();
-    const rawSlug = slugify(name, { lower: true });
-    const cleanSlug = rawSlug.replace(/[^a-zA-Z0-9]/g, '');
-    const product_sku = `SKU${cleanSlug}${timestamp}`;
+    const baseSlug = slugify(name, { lower: true, strict: true }) || 'product';
+    const product_sku = `${baseSlug}-${timestamp}`;
     let productHashtags = [];
 
     if (hashtags) {

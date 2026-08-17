@@ -1,4 +1,5 @@
 const Category = require('../models/categoryModel');
+const slugify = require('slugify');
 const authorizeAction = require('../utils/authorizeAction');
 const { uploadToS3 } = require('../utils/s3Uploader');
 const { deleteFilesFromS3 } = require('../utils/deleteFilesFromS3');
@@ -40,14 +41,17 @@ exports.createCategory = async (req, res) => {
           });
         }
 
+        const slug = slugify(categoryName, { lower: true, strict: true }) || 'category';
+
         // ✅ Insert
-          Category.createCategory(
-            categoryName,
-            createdBy,
-            creatorId,
-            category_image,
-            category_description, // ✅ LAST
-            (err, result) => {
+        Category.createCategory(
+          categoryName,
+          slug,
+          createdBy,
+          creatorId,
+          category_image,
+          category_description, // ✅ LAST
+          (err, result) => {
             if (err) {
               return res.status(500).json({ message: 'Server error' });
             }
@@ -55,7 +59,8 @@ exports.createCategory = async (req, res) => {
             return res.status(201).json({
               status: true,
               message: 'Category created successfully',
-              category_id: result.insertId
+              category_id: result.insertId,
+              slug
             });
           }
         );
@@ -93,6 +98,31 @@ exports.getCategoryID = (req, res) => {
   }
 
   Category.getCategorybyID(category_id, (err, category) => {
+    if (err) {
+      console.error('DB Error:', err);
+      return res.status(500).json({ status: false, message: 'Server error' });
+    }
+
+    if (!category) {
+      return res.status(404).json({ status: false, message: 'Category not found' });
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: 'Category fetched successfully',
+      data: category
+    });
+  });
+};
+
+exports.getCategoryBySlug = (req, res) => {
+  const { slug } = req.params;
+
+  if (!slug) {
+    return res.status(400).json({ status: false, message: 'Category slug is required' });
+  }
+
+  Category.getCategorybySlug(slug, (err, category) => {
     if (err) {
       console.error('DB Error:', err);
       return res.status(500).json({ status: false, message: 'Server error' });
@@ -219,7 +249,10 @@ exports.updateCategory = (req, res) => {
       }
 
       const updateData = {};
-      if (name) updateData.name = name;
+      if (name) {
+        updateData.name = name;
+        updateData.slug = slugify(name, { lower: true, strict: true }) || 'category';
+      }
       if (category_description) updateData.category_description = category_description;
 
       try {
@@ -275,7 +308,10 @@ exports.updateCategory = (req, res) => {
     }
 
     const updateData = {};
-    if (name) updateData.name = name;
+    if (name) {
+      updateData.name = name;
+      updateData.slug = slugify(name, { lower: true, strict: true }) || 'category';
+    }
 
     (async () => {
       try {
@@ -330,8 +366,9 @@ exports.createSubCategory = (req, res) => {
 
   const createdBy = sellerId ? "seller" : "admin";
   const creatorId = sellerId || null;
+  const slug = slugify(name, { lower: true, strict: true }) || 'subcategory';
 
-  Category.createSubCategory(name, parent_id, createdBy, creatorId, (err, result) => {
+  Category.createSubCategory(name, slug, parent_id, createdBy, creatorId, (err, result) => {
     if (err) {
       console.error(err);
       return res.status(500).json({
@@ -483,7 +520,8 @@ exports.updateSubCategory = (req, res) => {
   // ✅ Admin direct update
   if (Number(userRole) === Number(process.env.Admin_role_id)) {
 
-    return Category.updateSubCategoryByID(subcategory_id, { name }, (err, result) => {
+    const subSlug = slugify(name, { lower: true, strict: true }) || 'subcategory';
+    return Category.updateSubCategoryByID(subcategory_id, { name, slug: subSlug }, (err, result) => {
 
       if (err) {
         return res.status(500).json({
@@ -528,7 +566,8 @@ exports.updateSubCategory = (req, res) => {
       });
     }
 
-    Category.updateSubCategoryByID(subcategory_id, { name }, (err, result) => {
+    const subSlug = slugify(name, { lower: true, strict: true }) || 'subcategory';
+    Category.updateSubCategoryByID(subcategory_id, { name, slug: subSlug }, (err, result) => {
 
       if (err) {
         return res.status(500).json({
@@ -556,12 +595,12 @@ exports.updateSubCategory = (req, res) => {
 };
 
 exports.getProductsbyCatSubcatID = (req, res) => {
-  const { category_id } = req.params;
+  const category_id = req.params.category_id || req.params.slug;
 
   if (!category_id) {
     return res.status(400).json({
       status: false,
-      message: "Category ID required"
+      message: "Category ID or slug is required"
     });
   }
 

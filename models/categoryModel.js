@@ -16,14 +16,14 @@ exports.findCategoryByNameAndCreator = (name, createdBy, creatorId, callback) =>
 };
 
 // Insert a new category
-exports.createCategory = (name, createdBy, creatorId, category_image, category_description, callback) => {
+exports.createCategory = (name, slug, createdBy, creatorId, category_image, category_description, callback) => {
   const sql = `
     INSERT INTO product_categories 
-    (name, created_by, creator_id, category_image, category_description) 
-    VALUES (?, ?, ?, ?, ?)
+    (name, slug, created_by, creator_id, category_image, category_description) 
+    VALUES (?, ?, ?, ?, ?, ?)
   `;
 
-  db.query(sql, [name, createdBy, creatorId, category_image, category_description], callback);
+  db.query(sql, [name, slug, createdBy, creatorId, category_image, category_description], callback);
 };
 
 exports.getallCategories = (callback) => {
@@ -39,6 +39,14 @@ exports.getCategorybyID = (id, callback) => {
   db.query(sql, [id], (err, results) => {
     if (err) return callback(err, null);
     return callback(null, results[0]); // assuming you want a single product
+  });
+};
+
+exports.getCategorybySlug = (slug, callback) => {
+  const sql = 'SELECT * FROM product_categories WHERE slug = ? and parent_id is null';
+  db.query(sql, [slug], (err, results) => {
+    if (err) return callback(err, null);
+    return callback(null, results[0]);
   });
 };
 
@@ -75,13 +83,13 @@ exports.updateCategoryByID = (id, data, callback) => {
   });
 };
 
-exports.createSubCategory = (name, parentId, createdBy, creatorId, callback) => {
+exports.createSubCategory = (name, slug, parentId, createdBy, creatorId, callback) => {
   const query = `
-    INSERT INTO product_categories (name, parent_id, created_by, creator_id)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO product_categories (name, slug, parent_id, created_by, creator_id)
+    VALUES (?, ?, ?, ?, ?)
   `;
 
-  db.query(query, [name, parentId, createdBy, creatorId], (err, result) => {
+  db.query(query, [name, slug, parentId, createdBy, creatorId], (err, result) => {
     if (err) return callback(err, null);
     callback(null, result);
   });
@@ -137,44 +145,63 @@ exports.updateSubCategoryByID = (id, data, callback) => {
   });
 };
 
-exports.getProductByCategory = (category_id, callback) => {
-  const sql = `
-    SELECT 
-      p.*,
-      p.seller_id as storeId,
-      pc.name AS category_name,
-      s.store_name,
-      s.store_username,
+exports.getProductByCategory = (categoryIdentifier, callback) => {
+  const fetchProductsByCatId = (catId) => {
+    const sql = `
+      SELECT 
+        p.*,
+        p.seller_id as storeId,
+        pc.name AS category_name,
+        pc.slug AS category_slug,
+        s.store_name,
+        s.store_username,
 
-      COALESCE(r.total_review, 0) AS total_review,
-      COALESCE(r.avg_rating, 0) AS average_rating,
-      COALESCE(o.total_order, 0) AS total_order
+        COALESCE(r.total_review, 0) AS total_review,
+        COALESCE(r.avg_rating, 0) AS average_rating,
+        COALESCE(o.total_order, 0) AS total_order
 
-    FROM products p
+      FROM products p
 
-    LEFT JOIN (
-      SELECT target_id, COUNT(*) AS total_review, ROUND(AVG(rating), 1) AS avg_rating
-      FROM reviews
-      WHERE type = 'product'
-      GROUP BY target_id
-    ) r ON r.target_id = p.id
+      LEFT JOIN (
+        SELECT target_id, COUNT(*) AS total_review, ROUND(AVG(rating), 1) AS avg_rating
+        FROM reviews
+        WHERE type = 'product'
+        GROUP BY target_id
+      ) r ON r.target_id = p.id
 
-    LEFT JOIN (
-      SELECT product_id, COUNT(*) AS total_order
-      FROM order_items
-      GROUP BY product_id
-    ) o ON o.product_id = p.id
+      LEFT JOIN (
+        SELECT product_id, COUNT(*) AS total_order
+        FROM order_items
+        GROUP BY product_id
+      ) o ON o.product_id = p.id
 
-    LEFT JOIN seller_stores s ON s.seller_id = p.seller_id
-    LEFT JOIN product_categories pc ON pc.id = p.category_id
+      LEFT JOIN seller_stores s ON s.seller_id = p.seller_id
+      LEFT JOIN product_categories pc ON pc.id = p.category_id
 
-    LEFT JOIN product_categories sub 
-      ON sub.id = p.category_id AND sub.parent_id = ?
+      LEFT JOIN product_categories sub 
+        ON sub.id = p.category_id AND sub.parent_id = ?
 
-    WHERE 
-      p.category_id = ? 
-      OR sub.id IS NOT NULL;
-  `;
+      WHERE 
+        p.category_id = ? 
+        OR sub.id IS NOT NULL;
+    `;
 
-  db.query(sql, [category_id, category_id], callback);
+    db.query(sql, [catId, catId], callback);
+  };
+
+  const isNumeric = !isNaN(categoryIdentifier) && Number.isInteger(Number(categoryIdentifier));
+  if (isNumeric) {
+    fetchProductsByCatId(categoryIdentifier);
+  } else {
+    // Look up category ID by slug
+    const findSql = `SELECT id FROM product_categories WHERE slug = ? LIMIT 1`;
+    db.query(findSql, [categoryIdentifier], (err, results) => {
+      if (err) return callback(err, null);
+      if (results && results.length > 0) {
+        fetchProductsByCatId(results[0].id);
+      } else {
+        fetchProductsByCatId(categoryIdentifier);
+      }
+    });
+  }
 };

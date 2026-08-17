@@ -20,6 +20,7 @@ exports.getallProducts = (userId, callback) => {
       p.description,
       p.category_id,
       pc.name AS category_name,
+      pc.slug AS category_slug,
       p.stock,
       p.dimension,
       p.package_weight,
@@ -95,6 +96,7 @@ exports.getProductbySlug = (slug, userId, callback) => {
     SELECT 
       p.*,
       pc.name AS category_name,
+      pc.slug AS category_slug,
       s.store_name,
       s.store_username,
       s.seller_id AS storeId,
