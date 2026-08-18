@@ -526,7 +526,7 @@ exports.adminOrdersView = (req, res) => {
   });
 };
 
-exports.adminOrderStatusUpdate = (req, res) => {
+exports.adminOrderStatusUpdate = async (req, res) => {
   const role = req.user.role;
   if (role != process.env.Admin_role_id) {
     return res.status(403).json({ success: false, message: 'Unauthorized' });
