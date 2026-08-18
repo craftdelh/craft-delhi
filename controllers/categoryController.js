@@ -3,6 +3,7 @@ const slugify = require('slugify');
 const authorizeAction = require('../utils/authorizeAction');
 const { uploadToS3 } = require('../utils/s3Uploader');
 const { deleteFilesFromS3 } = require('../utils/deleteFilesFromS3');
+const { formatImageSizes, formatGalleryImages } = require('../utils/imageFormatter');
 const bucketName = process.env.AWS_BUCKET_NAME;
 
 
@@ -21,7 +22,8 @@ exports.createCategory = async (req, res) => {
 
     // ✅ Upload image
     if (req.file) {
-      category_image = await uploadToS3(req.file, 'category_image');
+      const uploadedImage = await uploadToS3(req.file, 'category_image');
+      category_image = typeof uploadedImage === 'object' ? JSON.stringify(uploadedImage) : uploadedImage;
     }
 
     // ✅ Check duplicate
@@ -81,11 +83,15 @@ exports.getCategories = (req, res) => {
       return res.status(500).json({status: false, message: 'Server error' });
     }
 
-    // Return all categories
+    const formatted = (categories || []).map(cat => ({
+      ...cat,
+      category_image: formatImageSizes(cat.category_image)
+    }));
+
     return res.status(200).json({
       status: true,
       message: 'Categories fetched successfully',
-      data: categories
+      data: formatted
     });
   });
 };
@@ -107,10 +113,15 @@ exports.getCategoryID = (req, res) => {
       return res.status(404).json({ status: false, message: 'Category not found' });
     }
 
+    const formatted = {
+      ...category,
+      category_image: formatImageSizes(category.category_image)
+    };
+
     return res.status(200).json({
       status: true,
       message: 'Category fetched successfully',
-      data: category
+      data: formatted
     });
   });
 };
@@ -132,10 +143,15 @@ exports.getCategoryBySlug = (req, res) => {
       return res.status(404).json({ status: false, message: 'Category not found' });
     }
 
+    const formatted = {
+      ...category,
+      category_image: formatImageSizes(category.category_image)
+    };
+
     return res.status(200).json({
       status: true,
       message: 'Category fetched successfully',
-      data: category
+      data: formatted
     });
   });
 };
@@ -266,7 +282,7 @@ exports.updateCategory = (req, res) => {
           }
 
           const uploadedImage = await uploadToS3(req.file, 'category_image');
-          updateData.category_image = uploadedImage;
+          updateData.category_image = typeof uploadedImage === 'object' ? JSON.stringify(uploadedImage) : uploadedImage;
         }
 
         Category.updateCategoryByID(category_id, updateData, (err, result) => {
@@ -325,7 +341,7 @@ exports.updateCategory = (req, res) => {
           }
 
           const uploadedImage = await uploadToS3(req.file, 'category_image');
-          updateData.category_image = uploadedImage;
+          updateData.category_image = typeof uploadedImage === 'object' ? JSON.stringify(uploadedImage) : uploadedImage;
         }
 
         Category.updateCategoryByID(category_id, updateData, (err, result) => {
@@ -612,10 +628,16 @@ exports.getProductsbyCatSubcatID = (req, res) => {
       });
     }
 
+    const formatted = (data || []).map(p => ({
+      ...p,
+      main_image_url: formatImageSizes(p.main_image_url),
+      gallery_images: formatGalleryImages(p.gallery_images)
+    }));
+
     res.status(200).json({
       status: true,
       message: "Products fetched successfully",
-      data
+      data: formatted
     });
   });
 };

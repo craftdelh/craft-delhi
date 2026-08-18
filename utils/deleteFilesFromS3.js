@@ -25,16 +25,38 @@ const getS3KeyFromUrl = (input) => {
   }
 };
 
+const extractKeys = (input) => {
+  if (!input) return [];
+  if (typeof input === 'object') {
+    return Object.values(input).map(getS3KeyFromUrl).filter(Boolean);
+  }
+  if (typeof input === 'string') {
+    if (input.startsWith('{') && input.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(input);
+        return Object.values(parsed).map(getS3KeyFromUrl).filter(Boolean);
+      } catch (e) {}
+    }
+    const key = getS3KeyFromUrl(input);
+    return key ? [key] : [];
+  }
+  return [];
+};
+
 /**
- * Delete multiple files from S3 given an array of file URLs.
- * @param {string[]} urls
+ * Delete multiple files from S3 given an array of file URLs or objects.
+ * @param {Array} urls
  * @param {string} bucketName
  */
 const deleteFilesFromS3 = async (urls = [], bucketName) => {
-  const objectsToDelete = urls
-    .map(getS3KeyFromUrl)
-    .filter(Boolean)
-    .map(key => ({ Key: key }));
+  const keys = [];
+  const inputList = Array.isArray(urls) ? urls : [urls];
+  
+  inputList.forEach(item => {
+    keys.push(...extractKeys(item));
+  });
+
+  const objectsToDelete = [...new Set(keys)].map(key => ({ Key: key }));
 
   if (!objectsToDelete.length) return { deleted: [], skipped: true };
 
@@ -46,7 +68,7 @@ const deleteFilesFromS3 = async (urls = [], bucketName) => {
   try {
     const result = await s3.send(command);
     return {
-      deleted: result.Deleted.map(obj => obj.Key),
+      deleted: (result.Deleted || []).map(obj => obj.Key),
       skipped: false
     };
   } catch (err) {

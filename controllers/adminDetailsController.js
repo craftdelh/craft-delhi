@@ -3,6 +3,7 @@ const Settlement = require('../models/settlementModel');
 require('dotenv').config();
 const { uploadToS3, getS3KeyFromUrl } = require('../utils/s3Uploader');
 const { deleteFilesFromS3 } = require('../utils/deleteFilesFromS3');
+const { checkPaymentProcessedForDelivery } = require('../utils/updateUtils');
 const sendEmail = require('../utils/mailHelper'); // adjust path as per your project
 
 exports.getDashboardStats = (req, res) => {
@@ -556,6 +557,16 @@ exports.adminOrderStatusUpdate = (req, res) => {
   // Ensure at least one field is being updated
   if (order_status === undefined && payment_status === undefined) {
     return res.status(400).json({ success: false, message: 'No status field provided to update' });
+  }
+
+  if (order_status !== undefined && Number(order_status) === 3) {
+    const isPaid = await checkPaymentProcessedForDelivery(order_id, payment_status);
+    if (!isPaid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot mark order as Delivered because the payment is not processed/paid. Payment status must be Paid (1).'
+      });
+    }
   }
 
   // Update

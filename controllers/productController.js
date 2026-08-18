@@ -3,6 +3,7 @@ const slugify = require('slugify');
 const { uploadToS3, getS3KeyFromUrl  } = require('../utils/s3Uploader');
 const authorizeAction = require('../utils/authorizeAction');
 const { deleteFilesFromS3 } = require('../utils/deleteFilesFromS3');
+const { formatImageSizes, formatGalleryImages } = require('../utils/imageFormatter');
 const bucketName = process.env.AWS_BUCKET_NAME;
 
 exports.deleteProduct = (req, res) => {
@@ -184,7 +185,8 @@ exports.addProduct = async (req, res) => {
     let reelUrl = null;
 
     if (req.files['main_image']?.[0]) {
-      mainImage = await uploadToS3(req.files['main_image'][0], 'main_image');
+      const uploadedMain = await uploadToS3(req.files['main_image'][0], 'main_image');
+      mainImage = typeof uploadedMain === 'object' ? JSON.stringify(uploadedMain) : uploadedMain;
     }
 
     if (req.files['gallery_images']) {
@@ -250,10 +252,16 @@ exports.getProducts = (req, res) => {
       return res.status(500).json({ status: false, message: 'Server error' });
     }
 
+    const formatted = (products || []).map(p => ({
+      ...p,
+      main_image_url: formatImageSizes(p.main_image_url),
+      gallery_images: formatGalleryImages(p.gallery_images)
+    }));
+
     return res.status(200).json({
       status: true,
       message: 'Products fetched successfully',
-      data: products
+      data: formatted
     });
   });
 };
@@ -276,10 +284,16 @@ exports.getProductsbySlug = (req, res) => {
       return res.status(404).json({ status: false, message: 'Product not found' });
     }
 
+    const formatted = {
+      ...product,
+      main_image_url: formatImageSizes(product.main_image_url),
+      gallery_images: formatGalleryImages(product.gallery_images)
+    };
+
     return res.status(200).json({
       status: true,
       message: 'Product fetched successfully',
-      data: product
+      data: formatted
     });
   });
 };
@@ -301,10 +315,16 @@ exports.getProductRecommendations = (req, res) => {
       return res.status(500).json({ status: false, message: 'Failed to fetch recommendations' });
     }
 
+    const formatted = (products || []).map(p => ({
+      ...p,
+      main_image_url: formatImageSizes(p.main_image_url),
+      gallery_images: formatGalleryImages(p.gallery_images)
+    }));
+
     return res.status(200).json({
       status: true,
       message: 'Product recommendations fetched successfully',
-      data: products
+      data: formatted
     });
   });
 };
@@ -424,7 +444,8 @@ async function handleProductUpdate(existingProduct, product_id, req, res) {
       if (existingProduct.main_image_url) {
         await deleteFilesFromS3([existingProduct.main_image_url], bucketName);
       }
-      updateData.main_image_url = await uploadToS3(req.files.main_image[0], 'main_image');
+      const uploadedMain = await uploadToS3(req.files.main_image[0], 'main_image');
+      updateData.main_image_url = typeof uploadedMain === 'object' ? JSON.stringify(uploadedMain) : uploadedMain;
     } else if (main_image_url && main_image_url !== existingProduct.main_image_url) {
       await deleteFilesFromS3([existingProduct.main_image_url], bucketName);
       updateData.main_image_url = main_image_url;

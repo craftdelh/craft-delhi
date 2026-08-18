@@ -11,8 +11,39 @@ const orderTrackingModel = require('../models/orderTrackingModel');
  * @param {object} res - Express response object.
  */
 
+const db = require('../config/db');
+
+const checkPaymentProcessedForDelivery = (order_id, paymentStatusPayload) => {
+  return new Promise((resolve, reject) => {
+    if (paymentStatusPayload !== undefined && paymentStatusPayload !== null && Number(paymentStatusPayload) === 1) {
+      return resolve(true);
+    }
+    const sql = `SELECT payment_status FROM payments WHERE order_id = ? LIMIT 1`;
+    db.query(sql, [order_id], (err, results) => {
+      if (err) return reject(err);
+      if (!results || results.length === 0) return resolve(false);
+      return resolve(Number(results[0].payment_status) === 1);
+    });
+  });
+};
+
+exports.checkPaymentProcessedForDelivery = checkPaymentProcessedForDelivery;
+
 exports.handleOrderAndTrackingUpdate = async (order_id, orderData = {}, trackingData = {}, paymentData = {}, res) => {
   try {
+    const isOrderDelivered = orderData.order_status !== undefined && Number(orderData.order_status) === 3;
+    const isTrackingDelivered = trackingData.status !== undefined && Number(trackingData.status) === 3;
+
+    if (isOrderDelivered || isTrackingDelivered) {
+      const isPaid = await checkPaymentProcessedForDelivery(order_id, paymentData.payment_status);
+      if (!isPaid) {
+        return res.status(400).json({
+          status: false,
+          message: "Cannot mark order as Delivered because the payment is not processed/paid. Payment status must be Paid (1)."
+        });
+      }
+    }
+
     const hasOrderFields = Object.keys(orderData).length > 0;
     const hasPaymentFields = Object.keys(paymentData).length > 0;
 
@@ -141,6 +172,16 @@ exports.handleOrderAndTrackingUpdate = async (order_id, orderData = {}, tracking
 
 exports.updateOrderStatusOnly = async (order_id, order_status, res) => {
   try {
+    if (order_status !== undefined && Number(order_status) === 3) {
+      const isPaid = await checkPaymentProcessedForDelivery(order_id);
+      if (!isPaid) {
+        return res.status(400).json({
+          status: false,
+          message: "Cannot mark order as Delivered because the payment is not processed/paid. Payment status must be Paid (1)."
+        });
+      }
+    }
+
     Order.updateOrderByID(order_id, { order_status }, (err, result) => {
       if (err) {
         console.error('❌ DB update error:', err);

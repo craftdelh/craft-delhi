@@ -42,7 +42,8 @@ exports.createGiftCategory = async (req, res) => {
 
     // ✅ upload image
     if (req.file) {
-      gift_image = await uploadToS3(req.file, 'gift_image');
+      const uploadedImg = await uploadToS3(req.file, 'gift_image');
+      gift_image = typeof uploadedImg === 'object' ? JSON.stringify(uploadedImg) : uploadedImg;
     }
 
     GiftCategories.createGiftCategory(
@@ -199,7 +200,7 @@ exports.updateGiftCategory = async (req, res) => {
           }
 
           const uploadedImage = await uploadToS3(req.file, 'gift_image');
-          updateData.gift_image = uploadedImage;
+          updateData.gift_image = typeof uploadedImage === 'object' ? JSON.stringify(uploadedImage) : uploadedImage;
         }
 
         GiftCategories.updateGiftCategory(id, updateData, (updateErr) => {
