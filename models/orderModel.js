@@ -325,6 +325,7 @@ exports.getOrdersbyUserID = (user_id, callback) => {
       u.email,
       u.phone_number,
       p.name AS product_name,
+      p.product_sku,
       p.main_image_url,
       ua.street,
       ua.city,
