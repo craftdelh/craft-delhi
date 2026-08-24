@@ -402,6 +402,7 @@ exports.getOrdersbyUserID = (user_id, callback) => {
         ordersMap[row.order_id].items.push({
           item_id: row.item_id,
           product_id: row.product_id,
+          product_sku: row.product_sku,
           main_image_url: row.main_image_url,
           product_name: row.product_name,
           quantity: row.quantity,
