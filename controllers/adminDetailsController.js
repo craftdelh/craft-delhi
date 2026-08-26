@@ -5,6 +5,7 @@ const { uploadToS3, getS3KeyFromUrl } = require('../utils/s3Uploader');
 const { deleteFilesFromS3 } = require('../utils/deleteFilesFromS3');
 const { checkPaymentProcessedForDelivery } = require('../utils/updateUtils');
 const sendEmail = require('../utils/mailHelper'); // adjust path as per your project
+const { sendNotification } = require('../utils/notificationHelper');
 
 exports.getDashboardStats = (req, res) => {
   const role = req.user.role;
@@ -92,15 +93,25 @@ exports.updateApprovalStatus = (req, res) => {
     }
 
     // ------------------------------------------
-    // 📩 SEND EMAIL WHEN APPROVED OR REJECTED
+    // 📩 SEND EMAIL & REALTIME SOCKET NOTIFICATION WHEN APPROVED OR REJECTED
     // ------------------------------------------
     adminModel.getSellerDetailsByProductID(product_id, async (err2, sellerData) => {
       if (!err2 && sellerData?.email) {
-        const { email, first_name, last_name, product_name } = sellerData;
+        const { seller_id, email, first_name, last_name, product_name } = sellerData;
         const sellerName = `${first_name} ${last_name}`;
 
         // If REJECTED
         if (status === 2) {
+          if (seller_id) {
+            await sendNotification({
+              userId: seller_id,
+              title: "Product Rejected",
+              message: `Your product "${product_name || 'Item'}" was rejected. Reason: ${reject_reason || 'Not specified'}.`,
+              type: "PRODUCT_REJECTED",
+              referenceId: product_id
+            }).catch(e => console.error("Notification trigger error:", e));
+          }
+
           try {
             await sendEmail({
               to: email,
@@ -127,6 +138,16 @@ exports.updateApprovalStatus = (req, res) => {
 
         // If APPROVED
         if (status === 1) {
+          if (seller_id) {
+            await sendNotification({
+              userId: seller_id,
+              title: "Product Approved",
+              message: `Your product "${product_name || 'Item'}" has been approved by admin and is now live!`,
+              type: "PRODUCT_APPROVED",
+              referenceId: product_id
+            }).catch(e => console.error("Notification trigger error:", e));
+          }
+
           try {
             await sendEmail({
               to: email,

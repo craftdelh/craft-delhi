@@ -569,12 +569,15 @@ exports.getRevenueStats = (callback) => {
 
 exports.getSellerDetailsByProductID = (productId, callback) => {
   const sql = `
-    SELECT u.email, u.first_name, u.last_name, p.name
+    SELECT u.id AS seller_id, u.email, u.first_name, u.last_name, p.name, p.name AS product_name
     FROM products p
     JOIN users u ON p.seller_id = u.id
     WHERE p.id = ?
   `;
-  db.query(sql, [productId], callback);
+  db.query(sql, [productId], (err, results) => {
+    if (err) return callback(err, null);
+    return callback(null, results[0]);
+  });
 };
 
 

@@ -4,6 +4,7 @@ const OrderTracking = require('../models/orderTrackingModel');
 const {handleOrderAndTrackingUpdate, updateOrderStatusOnly, markOrderAsCancelled} = require('../utils/updateUtils');
 const {generateInvoicePDF} = require('../utils/invoiceGenerator');
 const settlementService = require('../utils/settlementService');
+const { sendNotification } = require('../utils/notificationHelper');
 
 // ✅ Create Order
 exports.createOrder = (req, res) => {
@@ -74,6 +75,27 @@ exports.createOrder = (req, res) => {
 
         // Trigger settlement process if online and paid (Currently ON HOLD via ENABLE_SETTLEMENT_PROCESS=false)
         settlementService.triggerSettlementIfOnline(orderId, seller_id, total_amount, payment_status, payment_type);
+
+        // 🔔 Send Real-time Socket & DB Notifications
+        if (seller_id) {
+          sendNotification({
+            userId: seller_id,
+            title: "New Order Received",
+            message: `You received a new order #${order_uid} for ₹${total_amount}.`,
+            type: "NEW_ORDER",
+            referenceId: orderId
+          }).catch(e => console.error("Seller Notification Error:", e));
+        }
+
+        if (userId) {
+          sendNotification({
+            userId: userId,
+            title: "Order Placed Successfully",
+            message: `Your order #${order_uid} for ₹${total_amount} has been placed.`,
+            type: "ORDER_PLACED",
+            referenceId: orderId
+          }).catch(e => console.error("Buyer Notification Error:", e));
+        }
 
         // ✅ Fetch full order details after creation
         Order.getOrderById(orderId, userId, (fetchErr, newOrder) => {

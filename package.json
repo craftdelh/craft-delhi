@@ -5,7 +5,8 @@
   "scripts": {
     "test": "node --test",
     "dev": "nodemon server.js",
-    "migrate:category-slug": "node scripts/migrate_category_slug.js"
+    "migrate:category-slug": "node scripts/migrate_category_slug.js",
+    "migrate:notifications": "node scripts/migrate_notifications.js"
   },
   "keywords": [],
   "author": "",

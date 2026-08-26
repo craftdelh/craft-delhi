@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const Razorpay = require('razorpay');
 const Order = require('../models/orderModel');
 const settlementService = require('../utils/settlementService');
+const { sendNotification } = require('../utils/notificationHelper');
 require('dotenv').config();
 
 // Helper to initialize Razorpay SDK instance
@@ -155,6 +156,27 @@ exports.verifyRazorpayPayment = async (req, res) => {
 
           // Trigger settlement process using the Razorpay payout service (Currently ON HOLD via ENABLE_SETTLEMENT_PROCESS=false)
           settlementService.triggerSettlementIfOnline(orderId, seller_id, total_amount, 1, 'Online');
+
+          // 🔔 Send Real-time Socket & DB Notifications for Online Payment
+          if (seller_id) {
+            sendNotification({
+              userId: seller_id,
+              title: "Prepaid Order Received & Payment Verified",
+              message: `Order #${order_uid} of ₹${total_amount} paid successfully via Razorpay (ID: ${razorpay_payment_id}).`,
+              type: "PAYMENT_RECEIVED",
+              referenceId: orderId
+            }).catch(e => console.error("Seller Razorpay Notification Error:", e));
+          }
+
+          if (userId) {
+            sendNotification({
+              userId: userId,
+              title: "Payment Successful",
+              message: `Your payment of ₹${total_amount} for order #${order_uid} was verified successfully.`,
+              type: "PAYMENT_RECEIVED",
+              referenceId: orderId
+            }).catch(e => console.error("Buyer Razorpay Notification Error:", e));
+          }
 
           Order.getOrderById(orderId, userId, (fetchErr, newOrder) => {
             if (fetchErr) {

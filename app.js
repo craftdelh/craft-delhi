@@ -16,6 +16,7 @@ const reviewsRoutes = require('./routes/reviewsRoutes');
 const giftCategories = require('./routes/giftCategoriesRoutes');
 const searchRoutes = require('./routes/SearchRoutes');
 const customOrderRoutes = require('./routes/customOrderRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 
 const app = express();
@@ -38,5 +39,6 @@ app.use('/api/reviews', reviewsRoutes);
 app.use('/api/custom-orders', customOrderRoutes);
 app.use('/api/gift-categories', giftCategories);
 app.use('/api/searchall', searchRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 module.exports = app;

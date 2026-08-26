@@ -1,6 +1,7 @@
 const Order = require('../models/orderModel');
 const Payment = require('../models/paymentModel');
 const orderTrackingModel = require('../models/orderTrackingModel');
+const { sendNotification } = require('./notificationHelper');
 
 /**
  * Updates an order and optionally adds/updates its tracking info.
@@ -192,6 +193,33 @@ exports.updateOrderStatusOnly = async (order_id, order_status, res) => {
       }
 
       if (result.affectedRows > 0) {
+        // Trigger Notifications for Buyer & Seller
+        Order.getOrderByIDforVerification(order_id, (fetchErr, orderInfo) => {
+          if (!fetchErr && orderInfo) {
+            const statusNames = { 0: 'Pending', 1: 'Confirmed', 2: 'Shipped', 3: 'Delivered', 4: 'Cancelled' };
+            const statusLabel = statusNames[order_status] || 'Updated';
+
+            if (orderInfo.user_id) {
+              sendNotification({
+                userId: orderInfo.user_id,
+                title: `Order Status: ${statusLabel}`,
+                message: `Your order status has been updated to ${statusLabel}.`,
+                type: 'ORDER_STATUS',
+                referenceId: order_id
+              }).catch(e => console.error("Buyer Status Notification Error:", e));
+            }
+            if (orderInfo.seller_id) {
+              sendNotification({
+                userId: orderInfo.seller_id,
+                title: `Order Status: ${statusLabel}`,
+                message: `Order #${order_id} status updated to ${statusLabel}.`,
+                type: 'ORDER_STATUS',
+                referenceId: order_id
+              }).catch(e => console.error("Seller Status Notification Error:", e));
+            }
+          }
+        });
+
         return res.status(200).json({
           status: true,
           message: 'Order status updated successfully'
@@ -296,6 +324,29 @@ exports.markOrderAsCancelled = async (order_id, order_status, cancel_reason, res
       }
 
       if (result.affectedRows > 0) {
+        Order.getOrderByIDforVerification(order_id, (fetchErr, orderInfo) => {
+          if (!fetchErr && orderInfo) {
+            if (orderInfo.user_id) {
+              sendNotification({
+                userId: orderInfo.user_id,
+                title: 'Order Cancelled',
+                message: `Your order #${order_id} was cancelled. Reason: ${cancel_reason}`,
+                type: 'ORDER_CANCELLED',
+                referenceId: order_id
+              }).catch(e => console.error("Buyer Cancel Notification Error:", e));
+            }
+            if (orderInfo.seller_id) {
+              sendNotification({
+                userId: orderInfo.seller_id,
+                title: 'Order Cancelled',
+                message: `Order #${order_id} was cancelled. Reason: ${cancel_reason}`,
+                type: 'ORDER_CANCELLED',
+                referenceId: order_id
+              }).catch(e => console.error("Seller Cancel Notification Error:", e));
+            }
+          }
+        });
+
         return res.status(200).json({
           status: true,
           message: 'Order status updated successfully'
