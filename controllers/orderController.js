@@ -405,3 +405,78 @@ exports.getOrderInvoice = (req, res) => {
     }
   );
 };
+
+// ✅ Create Order from Quotation
+exports.createQuotationOrder = (req, res) => {
+  const userId = req.user?.id || req.body.user_id;
+  const {
+    seller_id,
+    total_amount,
+    payment_uid,
+    razorpay_order_id,
+    shipping_address_id,
+    buyer_note
+  } = req.body;
+
+  if (!userId || !seller_id || !total_amount) {
+    return res.status(400).json({ status: false, message: "Missing required fields: user_id, seller_id, total_amount" });
+  }
+
+  const order_uid = `ORD${Date.now()}`;
+  const paymentUid = payment_uid || `PAY${Math.floor(1000 + Math.random() * 9000)}`;
+
+  Order.createOrder(
+    userId,
+    {
+      order_uid,
+      total_amount,
+      order_status: 1, // Confirmed
+      payment_status: 1, // Paid
+      payment_type: 'Online',
+      payment_method: 'Razorpay',
+      payment_uid: paymentUid,
+      razorpay_order_id: razorpay_order_id || null,
+      shipping_address_id: shipping_address_id ? Number(shipping_address_id) : 0,
+      seller_id,
+      buyer_note: buyer_note || "Quotation order"
+    },
+    (err, orderResult) => {
+      if (err) {
+        console.error("Quotation Order Creation Error:", err);
+        return res.status(500).json({ status: false, message: "Failed to create quotation order" });
+      }
+
+      const orderId = orderResult.order_id;
+
+      // 🔔 Send Real-time Notifications
+      if (seller_id) {
+        sendNotification({
+          userId: seller_id,
+          title: "New Quotation Order Received",
+          message: `Quotation order #${order_uid} for ₹${total_amount} created and paid.`,
+          type: "NEW_ORDER",
+          referenceId: orderId
+        }).catch(e => console.error("Seller Notification Error:", e));
+      }
+
+      if (userId) {
+        sendNotification({
+          userId: userId,
+          title: "Quotation Order Confirmed",
+          message: `Your quotation order #${order_uid} for ₹${total_amount} has been created.`,
+          type: "ORDER_PLACED",
+          referenceId: orderId
+        }).catch(e => console.error("Buyer Notification Error:", e));
+      }
+
+      return res.status(201).json({
+        status: true,
+        message: "Quotation order created successfully",
+        data: {
+          order_id: orderId,
+          order_uid
+        }
+      });
+    }
+  );
+};
