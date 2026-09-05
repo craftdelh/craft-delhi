@@ -418,18 +418,29 @@ exports.updateSellerStatus = async (req, res) => {
         });
       }
 
-      // If seller is rejected → send email
-      if (user_approval === 2) {
-        adminModel.getUserEmail(seller_id, async (err2, result) => {
-          if (err2) {
-            return res.status(500).json({
-              success: false,
-              message: "Failed to fetch seller email",
-              error: err2,
-            });
-          }
+      adminModel.getUserEmail(seller_id, async (err2, result) => {
+        if (err2) {
+          return res.status(500).json({
+            success: false,
+            message: "Failed to fetch seller email",
+            error: err2,
+          });
+        }
 
-          const { email, first_name, last_name } = result;
+        const { email, first_name, last_name } = result || {};
+        const sellerName = `${first_name || ''} ${last_name || ''}`.trim() || 'Seller';
+
+        // If seller is REJECTED (user_approval === 2) → send email & in-app notification
+        if (user_approval === 2) {
+          if (seller_id) {
+            await sendNotification({
+              userId: seller_id,
+              title: "Seller Account Rejected",
+              message: `Your seller account registration was rejected. Reason: ${reject_reason || 'Not specified'}.`,
+              type: "SELLER_REJECTED",
+              referenceId: String(seller_id)
+            }).catch(e => console.error("Seller rejection notification error:", e));
+          }
 
           if (email) {
             try {
@@ -438,11 +449,11 @@ exports.updateSellerStatus = async (req, res) => {
                 subject: "Your Seller Account Has Been Rejected",
                 title: "Seller Account Rejected",
                 message: `
-                  Hello, ${first_name} ${last_name},<br><br>
-                  Your seller account has been <b>Rejected</b> on Craft Delhi.<br><br>
+                  Hello ${sellerName},<br><br>
+                  Your seller account has been <span style="color:red; font-weight:bold;">Rejected</span> on Craft Delhi.<br><br>
 
-                  <b>Reason:</b> ${reject_reason}<br>
-                  <b>Description:</b> ${reject_description}<br><br>
+                  <b>Reason:</b> ${reject_reason || 'Not provided'}<br>
+                  <b>Description:</b> ${reject_description || 'Not provided'}<br><br>
 
                   If you think this decision was incorrect or want further clarity,<br>
                   please contact our support team.<br><br>
@@ -457,19 +468,52 @@ exports.updateSellerStatus = async (req, res) => {
             }
           }
 
-          // Final response after email attempts
           return res.status(200).json({
             success: true,
-            message: "Status updated & email sent (if applicable)",
+            message: "Seller status updated & rejection email sent",
           });
-        });
-      } else {
-        // Seller Approved → Only update status
-        return res.status(200).json({
-          success: true,
-          message: "Seller status updated successfully",
-        });
-      }
+        }
+
+        // If seller is APPROVED (user_approval === 1) → send approval email & in-app notification
+        if (user_approval === 1) {
+          if (seller_id) {
+            await sendNotification({
+              userId: seller_id,
+              title: "Seller Account Approved",
+              message: "Congratulations! Your seller account has been approved by admin and is now active.",
+              type: "SELLER_APPROVED",
+              referenceId: String(seller_id)
+            }).catch(e => console.error("Seller approval notification error:", e));
+          }
+
+          if (email) {
+            try {
+              await sendEmail({
+                to: email,
+                subject: "Your Seller Account Has Been Approved - Craft Delhi",
+                title: "Seller Account Approved!",
+                message: `
+                  Hello ${sellerName},<br><br>
+                  Congratulations! Your seller account on <b>Craft Delhi</b> has been <span style="color:green; font-weight:bold;">Approved</span>.<br><br>
+
+                  You can now log in to your seller dashboard, set up your store details, and start adding products.<br><br>
+
+                  Warm regards,<br>
+                  <b>Team Craft Delhi</b>
+                `,
+                text: `Hello ${sellerName},\n\nCongratulations! Your seller account on Craft Delhi has been approved. You can now log in to your seller dashboard and start adding products.\n\nWarm regards,\nTeam Craft Delhi`
+              });
+            } catch (emailError) {
+              console.log("Failed to send seller approval email:", emailError);
+            }
+          }
+
+          return res.status(200).json({
+            success: true,
+            message: "Seller status approved, notification & email sent successfully",
+          });
+        }
+      });
     }
   );
 };
