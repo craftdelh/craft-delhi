@@ -82,7 +82,7 @@ exports.getallProducts = (userId, callback) => {
     LEFT JOIN seller_stores s ON s.seller_id = p.seller_id
     LEFT JOIN product_categories pc ON pc.id = p.category_id
 
-    WHERE p.admin_approval = 1;
+    WHERE p.admin_approval = 1 and p.status = 1;
   `;
 
   db.query(sql, [userId], (err, results) => {
@@ -137,7 +137,7 @@ exports.getProductbySlug = (slug, userId, callback) => {
     LEFT JOIN seller_stores s ON s.seller_id = p.seller_id
     LEFT JOIN product_categories pc ON pc.id = p.category_id
 
-    WHERE p.product_sku = ?;
+    WHERE p.product_sku = ? and p.status = 1;
   `;
 
   db.query(sql, [userId, slug], (err, results) => {
