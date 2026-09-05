@@ -131,12 +131,18 @@ exports.getProfileDetails = (req, res) => {
       return res.status(500).json({ status: false, message: 'Internal server error' });
     }
 
-    if (!profile) {
-      return res.status(404).json({ status: false, message: 'profile not found for this user' });
+    if (!profile || (!profile.phone_number && !profile.home_address && !profile.office_address)) {
+      return res.status(200).json({
+        status: false,
+        has_details: false,
+        message: 'You need to add your profile details for the first time. Please complete your profile settings.',
+        profile: profile || null
+      });
     }
 
     return res.status(200).json({
       status: true,
+      has_details: true,
       message: 'profile fetched successfully.',
       profile
     });
@@ -157,12 +163,18 @@ exports.getBankDetails = (req, res) => {
       return res.status(500).json({ status: false, message: 'Internal server error' });
     }
 
-    if (!bankDetails) {
-      return res.status(404).json({ status: false, message: 'Bank Details not found for this user' });
+    if (!bankDetails || !bankDetails.account_number || !bankDetails.ifsc_code) {
+      return res.status(200).json({
+        status: false,
+        has_details: false,
+        message: 'You need to add your bank details for the first time. Please complete your bank account settings.',
+        bankDetails: bankDetails || null
+      });
     }
 
     return res.status(200).json({
       status: true,
+      has_details: true,
       message: 'Bank Details fetched successfully.',
       bankDetails
     });
@@ -281,7 +293,7 @@ exports.getUserProfileDetails = (req, res) => {
   const user_id = req.user?.id;
 
   if (!user_id || isNaN(user_id)) {
-    return res.status(400).json({ status: false, message: 'Invalid seller ID' });
+    return res.status(400).json({ status: false, message: 'Invalid user ID' });
   }
 
   profileDetails.getUserProfileDetails(user_id, (err, profile) => {
@@ -290,12 +302,18 @@ exports.getUserProfileDetails = (req, res) => {
       return res.status(500).json({ status: false, message: 'Internal server error' });
     }
 
-    if (!profile) {
-      return res.status(404).json({ status: false, message: 'profile not found for this user' });
+    if (!profile || (!profile.phone_number && !profile.city && !profile.street)) {
+      return res.status(200).json({
+        status: false,
+        has_details: false,
+        message: 'You need to add your profile details for the first time. Please complete your profile settings.',
+        profile: profile || null
+      });
     }
 
     return res.status(200).json({
       status: true,
+      has_details: true,
       message: 'profile fetched successfully.',
       profile
     });
