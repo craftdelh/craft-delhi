@@ -129,12 +129,18 @@ exports.getStoreBySellerId = (req, res) => {
       return res.status(500).json({ status: false, message: 'Internal server error' });
     }
 
-    if (!store) {
-      return res.status(404).json({ status: false, message: 'Store not found for this seller' });
+    if (!store || !store.store_name) {
+      return res.status(200).json({
+        status: false,
+        has_details: false,
+        message: 'You need to add your store details for the first time. Please complete your store profile.',
+        store: store || null
+      });
     }
 
     return res.status(200).json({
       status: true,
+      has_details: true,
       message: 'Store fetched successfully.',
       store
     });

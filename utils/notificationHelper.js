@@ -161,7 +161,76 @@ const notifyAdminsNewProduct = async ({ sellerId, productId, productName }) => {
   }
 };
 
+/**
+ * Notify all admins when a new seller registers on Craft Delhi.
+ * 
+ * @param {Object} payload
+ * @param {number|string} payload.sellerId - User/seller ID
+ * @param {string} payload.firstName - Seller first name
+ * @param {string} payload.lastName - Seller last name
+ * @param {string} payload.email - Seller email
+ */
+const notifyAdminsNewSeller = async ({ sellerId, firstName, lastName, email }) => {
+  try {
+    const sellerName = `${firstName || ''} ${lastName || ''}`.trim() || email || `Seller #${sellerId}`;
+    const adminRoleId = process.env.Admin_role_id ? Number(process.env.Admin_role_id) : 1;
+    const adminSql = `SELECT id, email FROM users WHERE role = ? AND (account_trashed = 0 OR account_trashed IS NULL)`;
+
+    db.query(adminSql, [adminRoleId], async (adminErr, adminRows) => {
+      if (adminErr) {
+        console.error('❌ Error fetching admin users for new seller notification:', adminErr);
+        return;
+      }
+
+      if (!adminRows || adminRows.length === 0) {
+        console.warn('⚠️ No admin users found to notify for new seller registration.');
+        return;
+      }
+
+      for (const admin of adminRows) {
+        try {
+          await sendNotification({
+            userId: admin.id,
+            title: 'New Seller Registered',
+            message: `${sellerName} (${email}) has joined as a new seller. Please review to approve or reject their account.`,
+            type: 'NEW_SELLER_JOINED',
+            referenceId: String(sellerId),
+            email: admin.email,
+            sendMail: false
+          });
+        } catch (notifErr) {
+          console.error(`❌ Failed to notify admin ${admin.id} for new seller:`, notifErr.message);
+        }
+      }
+
+      // 🔊 Emit real-time socket events for admin UI
+      if (global.io) {
+        global.io.emit('newSellerJoined', {
+          seller_id: sellerId,
+          first_name: firstName,
+          last_name: lastName,
+          email
+        });
+
+        try {
+          const adminModel = require('../models/adminModel');
+          adminModel.getDashboardStats((statsErr, stats) => {
+            if (!statsErr && stats) {
+              global.io.emit('dashboardStatsUpdate', stats);
+            }
+          });
+        } catch (mErr) {
+          console.error('Error updating dashboard stats socket:', mErr);
+        }
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error in notifyAdminsNewSeller:', error);
+  }
+};
+
 module.exports = {
   sendNotification,
-  notifyAdminsNewProduct
+  notifyAdminsNewProduct,
+  notifyAdminsNewSeller
 };

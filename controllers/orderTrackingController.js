@@ -81,7 +81,7 @@ exports.updateTrackingInfo = (req, res) => {
 
   // 🔹 Allow Admin or Seller (who owns this order)
   if (roleId === parseInt(process.env.Admin_role_id)) {
-    return updateTrackingAuthorized(id, data, res);
+    return updateTrackingAuthorized(id, data, order_id, res);
   }
 
   authorizeAction(
@@ -93,7 +93,7 @@ exports.updateTrackingInfo = (req, res) => {
       if (authError) {
         return res.status(authError.code).json({ status: false, message: authError.message });
       }
-      await updateTrackingAuthorized(id, data, res);
+      await updateTrackingAuthorized(id, data, order_id, res);
     }
   );
 };

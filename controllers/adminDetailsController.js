@@ -580,12 +580,13 @@ exports.adminOrderStatusUpdate = async (req, res) => {
     return res.status(400).json({ success: false, message: 'No status field provided to update' });
   }
 
-  if (order_status !== undefined && Number(order_status) === 3) {
+  if (order_status !== undefined && [2, 3].includes(Number(order_status))) {
     const isPaid = await checkPaymentProcessedForDelivery(order_id, payment_status);
     if (!isPaid) {
+      const statusLabel = Number(order_status) === 2 ? 'Out for Delivery' : 'Delivered';
       return res.status(400).json({
         success: false,
-        message: 'Cannot mark order as Delivered because the payment is not processed/paid. Payment status must be Paid (1).'
+        message: `Cannot mark order as ${statusLabel} because the payment is not processed/paid. Payment status must be Paid (1).`
       });
     }
   }

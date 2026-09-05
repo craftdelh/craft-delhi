@@ -32,15 +32,17 @@ exports.checkPaymentProcessedForDelivery = checkPaymentProcessedForDelivery;
 
 exports.handleOrderAndTrackingUpdate = async (order_id, orderData = {}, trackingData = {}, paymentData = {}, res) => {
   try {
-    const isOrderDelivered = orderData.order_status !== undefined && Number(orderData.order_status) === 3;
-    const isTrackingDelivered = trackingData.status !== undefined && Number(trackingData.status) === 3;
+    const isOrderRestricted = orderData.order_status !== undefined && [2, 3].includes(Number(orderData.order_status));
+    const isTrackingRestricted = trackingData.status !== undefined && [2, 3].includes(Number(trackingData.status));
 
-    if (isOrderDelivered || isTrackingDelivered) {
+    if (isOrderRestricted || isTrackingRestricted) {
       const isPaid = await checkPaymentProcessedForDelivery(order_id, paymentData.payment_status);
       if (!isPaid) {
+        const targetStatus = isOrderRestricted ? Number(orderData.order_status) : Number(trackingData.status);
+        const statusLabel = targetStatus === 2 ? 'Out for Delivery' : 'Delivered';
         return res.status(400).json({
           status: false,
-          message: "Cannot mark order as Delivered because the payment is not processed/paid. Payment status must be Paid (1)."
+          message: `Cannot mark order as ${statusLabel} because the payment is not processed/paid. Payment status must be Paid (1).`
         });
       }
     }
@@ -173,12 +175,13 @@ exports.handleOrderAndTrackingUpdate = async (order_id, orderData = {}, tracking
 
 exports.updateOrderStatusOnly = async (order_id, order_status, res) => {
   try {
-    if (order_status !== undefined && Number(order_status) === 3) {
+    if (order_status !== undefined && [2, 3].includes(Number(order_status))) {
       const isPaid = await checkPaymentProcessedForDelivery(order_id);
       if (!isPaid) {
+        const statusLabel = Number(order_status) === 2 ? 'Out for Delivery' : 'Delivered';
         return res.status(400).json({
           status: false,
-          message: "Cannot mark order as Delivered because the payment is not processed/paid. Payment status must be Paid (1)."
+          message: `Cannot mark order as ${statusLabel} because the payment is not processed/paid. Payment status must be Paid (1).`
         });
       }
     }
@@ -242,6 +245,17 @@ exports.updateOrderStatusOnly = async (order_id, order_status, res) => {
 
 exports.addTrackingAuthorized = async (order_id, trackingData, res) => {
   try {
+    if (trackingData.status !== undefined && [2, 3].includes(Number(trackingData.status))) {
+      const isPaid = await checkPaymentProcessedForDelivery(order_id);
+      if (!isPaid) {
+        const statusLabel = Number(trackingData.status) === 2 ? 'Out for Delivery' : 'Delivered';
+        return res.status(400).json({
+          status: false,
+          message: `Cannot mark order as ${statusLabel} because the payment is not processed/paid. Payment status must be Paid (1).`
+        });
+      }
+    }
+
     // 🔹 Check if tracking already exists for this order
     orderTrackingModel.checkTrackingExists(order_id, (checkErr, result) => {
       if (checkErr) {
@@ -293,14 +307,32 @@ exports.addTrackingAuthorized = async (order_id, trackingData, res) => {
   }
 };
 
-exports.updateTrackingAuthorized = async (id, data, res) => {
-  orderTrackingModel.updateTracking(id, data, (err, result) => {
-    if (err) {
-      console.error('Error updating tracking info:', err);
-      return res.status(500).json({ message: 'Failed to update tracking info.' });
+exports.updateTrackingAuthorized = async (id, data, order_id, res) => {
+  try {
+    const responseObj = res || order_id;
+    const targetOrderId = (typeof order_id === 'number' || typeof order_id === 'string') ? order_id : null;
+
+    if (data.status !== undefined && [2, 3].includes(Number(data.status)) && targetOrderId) {
+      const isPaid = await checkPaymentProcessedForDelivery(targetOrderId);
+      if (!isPaid) {
+        const statusLabel = Number(data.status) === 2 ? 'Out for Delivery' : 'Delivered';
+        return responseObj.status(400).json({
+          status: false,
+          message: `Cannot mark order as ${statusLabel} because the payment is not processed/paid. Payment status must be Paid (1).`
+        });
+      }
     }
-    res.status(200).json({ message: 'Tracking info updated successfully.' });
-  });
+
+    orderTrackingModel.updateTracking(id, data, (err, result) => {
+      if (err) {
+        console.error('Error updating tracking info:', err);
+        return responseObj.status(500).json({ message: 'Failed to update tracking info.' });
+      }
+      responseObj.status(200).json({ message: 'Tracking info updated successfully.' });
+    });
+  } catch (error) {
+    console.error('Error in updateTrackingAuthorized:', error);
+  }
 };
 
 exports.runQuery = (connection, sql, params) => {

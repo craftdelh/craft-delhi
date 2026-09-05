@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const sendEmail = require('../utils/mailHelper'); // adjust path as per your project
+const { notifyAdminsNewSeller } = require('../utils/notificationHelper');
 
 const otpModel = require('../models/otpModel');
 const userModel = require('../models/userModel');
@@ -298,6 +299,14 @@ exports.register = (req, res) => {
             } catch (mailErr) {
               console.error('Admin approval email failed:', mailErr);
             }
+
+            // 🔔 Trigger DB & Socket Notification to Admins
+            notifyAdminsNewSeller({
+              sellerId: user.id,
+              firstName: first_name,
+              lastName: last_name,
+              email
+            }).catch(err => console.error('Failed to notify admins of new seller registration:', err));
 
             return res.status(201).json({
               status: true,
