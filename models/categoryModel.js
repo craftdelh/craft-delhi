@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const slugify = require('slugify');
 
 // Check if a category exists by name + creator
 exports.findCategoryByNameAndCreator = (name, createdBy, creatorId, callback) => {
@@ -204,4 +205,36 @@ exports.getProductByCategory = (categoryIdentifier, callback) => {
       }
     });
   }
+};
+
+exports.resolveCategoryId = (identifier) => {
+  return new Promise((resolve, reject) => {
+    if (identifier === undefined || identifier === null || identifier === '') {
+      return resolve(null);
+    }
+
+    const isNumeric = !isNaN(identifier) && Number.isInteger(Number(identifier));
+
+    if (isNumeric) {
+      const numId = Number(identifier);
+      const sql = 'SELECT id FROM product_categories WHERE id = ? LIMIT 1';
+      db.query(sql, [numId], (err, results) => {
+        if (err) return reject(err);
+        if (results && results.length > 0) {
+          return resolve(results[0].id);
+        }
+        return resolve(null);
+      });
+    } else {
+      const slugified = slugify(String(identifier), { lower: true, strict: true });
+      const sql = 'SELECT id FROM product_categories WHERE name = ? OR slug = ? OR slug = ? LIMIT 1';
+      db.query(sql, [identifier, identifier, slugified], (err, results) => {
+        if (err) return reject(err);
+        if (results && results.length > 0) {
+          return resolve(results[0].id);
+        }
+        return resolve(null);
+      });
+    }
+  });
 };

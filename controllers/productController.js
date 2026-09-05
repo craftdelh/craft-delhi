@@ -1,4 +1,5 @@
 const productModel = require('../models/productModel');
+const categoryModel = require('../models/categoryModel');
 const slugify = require('slugify');
 const { uploadToS3, getS3KeyFromUrl  } = require('../utils/s3Uploader');
 const authorizeAction = require('../utils/authorizeAction');
@@ -127,6 +128,14 @@ exports.addProduct = async (req, res) => {
       });
     }
 
+    const resolvedCatId = await categoryModel.resolveCategoryId(category_id);
+    if (!resolvedCatId) {
+      return res.status(400).json({
+        status: false,
+        error: `Invalid category: '${category_id}' not found`
+      });
+    }
+
     // 🧮 Convert price: handle single or comma-separated prices
     let finalPrice;
     if (typeof price === "string" && price.includes(',')) {
@@ -208,7 +217,7 @@ exports.addProduct = async (req, res) => {
       product_sku,
       description,
       price: finalPrice, // 👈 use modified price here
-      category_id,
+      category_id: resolvedCatId,
       stock,
       dimension,
       package_weight,
@@ -385,8 +394,19 @@ async function handleProductUpdate(existingProduct, product_id, req, res) {
       hashtags  
     } = req.body || {};
 
+    let resolvedCategoryId = category_id;
+    if (category_id !== undefined && category_id !== null && category_id !== '') {
+      resolvedCategoryId = await categoryModel.resolveCategoryId(category_id);
+      if (!resolvedCategoryId) {
+        return res.status(400).json({
+          status: false,
+          message: `Invalid category: '${category_id}' not found`
+        });
+      }
+    }
+
     const updateData = {
-      name, description, price, category_id, stock,
+      name, description, price, category_id: resolvedCategoryId, stock,
       dimension, package_weight, weight_type, warranty_type, video_name, reel_name, status
     };
     if (hashtags !== undefined) {
