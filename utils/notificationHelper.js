@@ -229,8 +229,93 @@ const notifyAdminsNewSeller = async ({ sellerId, firstName, lastName, email }) =
   }
 };
 
+/**
+ * Notify all admins when a seller updates a product (re-approval required).
+ * 
+ * @param {Object} payload
+ * @param {number} payload.sellerId - ID of seller who updated the product
+ * @param {number|string} payload.productId - ID of updated product
+ * @param {string} payload.productName - Name of updated product
+ */
+const notifyAdminsProductUpdated = async ({ sellerId, productId, productName }) => {
+  try {
+    const sellerSql = `
+      SELECT u.first_name, u.last_name, ss.store_name
+      FROM users u
+      LEFT JOIN seller_stores ss ON ss.seller_id = u.id
+      WHERE u.id = ?
+    `;
+
+    db.query(sellerSql, [sellerId], async (err, sellerRows) => {
+      if (err) {
+        console.error('❌ Error fetching seller details for notification:', err);
+        return;
+      }
+
+      const seller = sellerRows?.[0] || {};
+      const sellerName = seller.store_name || 
+        (seller.first_name ? `${seller.first_name} ${seller.last_name || ''}`.trim() : `Seller #${sellerId}`);
+
+      const adminRoleId = process.env.Admin_role_id ? Number(process.env.Admin_role_id) : 1;
+      const adminSql = `SELECT id, email FROM users WHERE role = ? AND (account_trashed = 0 OR account_trashed IS NULL)`;
+
+      db.query(adminSql, [adminRoleId], async (adminErr, adminRows) => {
+        if (adminErr) {
+          console.error('❌ Error fetching admin users for notification:', adminErr);
+          return;
+        }
+
+        if (!adminRows || adminRows.length === 0) {
+          console.warn('⚠️ No admin users found to notify for updated product.');
+          return;
+        }
+
+        for (const admin of adminRows) {
+          try {
+            await sendNotification({
+              userId: admin.id,
+              title: 'Product Updated (Approval Needed)',
+              message: `${sellerName} has updated the product "${productName}". Re-approval is required before it goes live.`,
+              type: 'PRODUCT_UPDATED_PENDING_APPROVAL',
+              referenceId: String(productId),
+              email: admin.email,
+              sendMail: false
+            });
+          } catch (notifErr) {
+            console.error(`❌ Failed to notify admin ${admin.id}:`, notifErr.message);
+          }
+        }
+
+        // 🔊 Emit real-time socket events for admin UI
+        if (global.io) {
+          global.io.emit('productUpdated', {
+            product_id: productId,
+            seller_id: sellerId,
+            seller_name: sellerName,
+            name: productName
+          });
+
+          try {
+            const adminModel = require('../models/adminModel');
+            adminModel.getDashboardStats((statsErr, stats) => {
+              if (!statsErr && stats) {
+                global.io.emit('dashboardStatsUpdate', stats);
+              }
+            });
+          } catch (mErr) {
+            console.error('Error updating dashboard stats socket:', mErr);
+          }
+        }
+      });
+    });
+  } catch (error) {
+    console.error('❌ Error in notifyAdminsProductUpdated:', error);
+  }
+};
+
 module.exports = {
   sendNotification,
   notifyAdminsNewProduct,
-  notifyAdminsNewSeller
+  notifyAdminsNewSeller,
+  notifyAdminsProductUpdated
 };

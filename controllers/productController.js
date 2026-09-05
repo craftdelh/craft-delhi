@@ -5,7 +5,7 @@ const { uploadToS3, getS3KeyFromUrl  } = require('../utils/s3Uploader');
 const authorizeAction = require('../utils/authorizeAction');
 const { deleteFilesFromS3 } = require('../utils/deleteFilesFromS3');
 const { formatImageSizes, formatGalleryImages } = require('../utils/imageFormatter');
-const { notifyAdminsNewProduct } = require('../utils/notificationHelper');
+const { notifyAdminsNewProduct, notifyAdminsProductUpdated } = require('../utils/notificationHelper');
 const bucketName = process.env.AWS_BUCKET_NAME;
 
 exports.deleteProduct = (req, res) => {
@@ -413,10 +413,17 @@ async function handleProductUpdate(existingProduct, product_id, req, res) {
       }
     }
 
+    const isSeller = req.user?.role !== parseInt(process.env.Admin_role_id);
+
     const updateData = {
       name, description, price, category_id: resolvedCategoryId, stock,
       dimension, package_weight, weight_type, warranty_type, video_name, reel_name, status
     };
+
+    // 🔒 If updated by a seller, reset admin_approval to 0 (requires admin re-approval)
+    if (isSeller) {
+      updateData.admin_approval = 0;
+    }
     if (hashtags !== undefined) {
       let updatedHashtags = [];
 
@@ -509,7 +516,20 @@ async function handleProductUpdate(existingProduct, product_id, req, res) {
       }
 
       if (result.affectedRows > 0) {
-        return res.status(200).json({ status: true, message: 'Product updated successfully' });
+        if (isSeller) {
+          notifyAdminsProductUpdated({
+            sellerId: req.user.id,
+            productId: product_id,
+            productName: updateData.name || existingProduct.name
+          }).catch(err => console.error('Failed to notify admins of product update:', err));
+        }
+
+        return res.status(200).json({
+          status: true,
+          message: isSeller
+            ? 'Product updated successfully and submitted for admin re-approval'
+            : 'Product updated successfully'
+        });
       } else {
         return res.status(400).json({ status: false, message: 'No changes made to the product' });
       }
