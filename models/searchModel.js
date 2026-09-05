@@ -10,6 +10,7 @@ exports.searchProductsByNameAndCategory = (search, callback) => {
       ON c.id = p.category_id
     WHERE 
       p.status = 1
+      AND p.admin_approval = 1
       AND (
         p.name LIKE ?
         OR c.name LIKE ?

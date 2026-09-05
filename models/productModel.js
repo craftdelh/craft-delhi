@@ -137,7 +137,7 @@ exports.getProductbySlug = (slug, userId, callback) => {
     LEFT JOIN seller_stores s ON s.seller_id = p.seller_id
     LEFT JOIN product_categories pc ON pc.id = p.category_id
 
-    WHERE p.product_sku = ? and p.status = 1;
+    WHERE p.product_sku = ? and p.status = 1 and p.admin_approval = 1;
   `;
 
   db.query(sql, [userId, slug], (err, results) => {
@@ -161,41 +161,80 @@ exports.getRecommendationsBySlug = (slug, limit, callback) => {
       candidate.gallery_images,
       candidate.price,
       candidate.created_at,
+
       category.name AS category_name,
       category.parent_id AS parent_category_id,
+
       store.store_name,
       store.store_username,
+
       COALESCE(review_stats.total_review, 0) AS total_review,
       COALESCE(review_stats.average_rating, 0) AS average_rating,
+
       COALESCE(order_stats.total_order, 0) AS total_order,
+
       ROUND(
         CASE
           WHEN candidate.category_id = current_product.category_id THEN 120
+
           WHEN COALESCE(category.parent_id, category.id) =
-               COALESCE(current_category.parent_id, current_category.id) THEN 70
+              COALESCE(
+                current_category.parent_id,
+                current_category.id
+              )
+          THEN 70
+
           ELSE 0
         END
+
         + GREATEST(
             0,
             30 - (
-              ABS(CAST(candidate.price AS DECIMAL(12, 2)) - CAST(current_product.price AS DECIMAL(12, 2)))
-              / GREATEST(CAST(current_product.price AS DECIMAL(12, 2)), 1)
+              ABS(
+                CAST(candidate.price AS DECIMAL(12, 2)) -
+                CAST(current_product.price AS DECIMAL(12, 2))
+              )
+              / GREATEST(
+                  CAST(current_product.price AS DECIMAL(12, 2)),
+                  1
+                )
             ) * 30
           )
-        + LEAST(COALESCE(review_stats.average_rating, 0) * 4, 20)
-        + LEAST(COALESCE(order_stats.total_order, 0), 20)
-        + GREATEST(0, 10 - (DATEDIFF(NOW(), candidate.created_at) / 30)),
+
+        + LEAST(
+            COALESCE(review_stats.average_rating, 0) * 4,
+            20
+          )
+
+        + LEAST(
+            COALESCE(order_stats.total_order, 0),
+            20
+          )
+
+        + GREATEST(
+            0,
+            10 - (
+              DATEDIFF(NOW(), candidate.created_at) / 30
+            )
+          ),
+
         2
       ) AS recommendation_score
+
     FROM products current_product
+
     JOIN product_categories current_category
       ON current_category.id = current_product.category_id
+
     JOIN products candidate
       ON candidate.id <> current_product.id
+
     JOIN product_categories category
       ON category.id = candidate.category_id
+
     LEFT JOIN seller_stores store
       ON store.seller_id = candidate.seller_id
+
     LEFT JOIN (
       SELECT
         target_id,
@@ -204,21 +243,33 @@ exports.getRecommendationsBySlug = (slug, limit, callback) => {
       FROM reviews
       WHERE type = 'product'
       GROUP BY target_id
-    ) review_stats ON review_stats.target_id = candidate.id
+    ) review_stats
+      ON review_stats.target_id = candidate.id
+
     LEFT JOIN (
-      SELECT product_id, COUNT(*) AS total_order
+      SELECT
+        product_id,
+        COUNT(*) AS total_order
       FROM order_items
       GROUP BY product_id
-    ) order_stats ON order_stats.product_id = candidate.id
+    ) order_stats
+      ON order_stats.product_id = candidate.id
+
     WHERE current_product.product_sku = ?
-      AND candidate.admin_approval = 1
+
+      -- Only show active and admin-approved recommended products
       AND candidate.status = 1
+      AND candidate.admin_approval = 1
+
+      -- Only show products that are in stock
       AND COALESCE(candidate.stock, 0) > 0
+
     ORDER BY
       recommendation_score DESC,
       total_order DESC,
       average_rating DESC,
       candidate.created_at DESC
+
     LIMIT ?
   `;
 
