@@ -5,6 +5,7 @@ const { uploadToS3, getS3KeyFromUrl  } = require('../utils/s3Uploader');
 const authorizeAction = require('../utils/authorizeAction');
 const { deleteFilesFromS3 } = require('../utils/deleteFilesFromS3');
 const { formatImageSizes, formatGalleryImages } = require('../utils/imageFormatter');
+const { notifyAdminsNewProduct } = require('../utils/notificationHelper');
 const bucketName = process.env.AWS_BUCKET_NAME;
 
 exports.deleteProduct = (req, res) => {
@@ -234,7 +235,14 @@ exports.addProduct = async (req, res) => {
       status: 1 // default true
     };
 
-    await productModel.insert(productData);
+    const insertResult = await productModel.insert(productData);
+
+    // 🔔 Notify admin users about new product added by seller
+    notifyAdminsNewProduct({
+      sellerId: seller_id,
+      productId: insertResult?.insertId,
+      productName: name
+    }).catch(err => console.error('Failed to notify admins of new product:', err));
 
     res.status(200).json({
       status: true,
