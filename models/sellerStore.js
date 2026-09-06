@@ -68,7 +68,20 @@ exports.getStoreBySellerId = (sellerId, callback) => {
       generateUniqueSlug();
     } else {
       // Slug already exists
-      return callback(null, store);
+      if ((!store.store_link || typeof store.store_link !== 'string' || store.store_link.trim() === '') && store.slug) {
+        const storeLink = `https://backend.craftdelhi.com/backend/api/seller-store/${store.slug}`;
+        db.query(
+          'UPDATE seller_stores SET store_link = ? WHERE id = ?',
+          [storeLink, store.id],
+          (err3) => {
+            if (err3) console.error('Error updating missing store_link:', err3);
+            store.store_link = storeLink;
+            return callback(null, store);
+          }
+        );
+      } else {
+        return callback(null, store);
+      }
     }
   });
 };

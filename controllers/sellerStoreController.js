@@ -85,13 +85,26 @@ exports.updateStore = async (req, res) => {
               store_image = typeof uploadedImage === 'object' ? JSON.stringify(uploadedImage) : uploadedImage;
             }
 
+            let finalStoreLink = store_link;
+            if (!finalStoreLink || (typeof finalStoreLink === 'string' && finalStoreLink.trim() === '')) {
+              const currentSlug = existingStore.slug;
+              if (currentSlug) {
+                finalStoreLink = `https://backend.craftdelhi.com/backend/api/seller-store/${currentSlug}`;
+              } else {
+                finalStoreLink = existingStore.store_link || undefined;
+              }
+            }
+
             const updateData = {
               store_name,
               store_username,
-              store_link,
               description,
               business_number
             };
+
+            if (finalStoreLink !== undefined) {
+              updateData.store_link = finalStoreLink;
+            }
 
             if (store_created_date && typeof store_created_date === 'string' && store_created_date.trim() !== '') {
               updateData.store_created_date = store_created_date;
