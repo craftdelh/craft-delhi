@@ -14,7 +14,7 @@ exports.getStoreBySellerId = (sellerId, callback) => {
       ss.store_link,
       ss.slug,
       ss.description,
-      ss.store_created_date,
+      COALESCE(ss.store_created_date, s.created_at, ss.created_at) AS store_created_date,
       ss.business_number,
       ss.store_image,
       s.first_name,
@@ -76,8 +76,9 @@ exports.getStoreBySellerId = (sellerId, callback) => {
 // Create a store
 exports.createStore = (data, callback) => {
   const query = `
-    INSERT INTO seller_stores (seller_id, created_at)
-    VALUES (?, NOW())
+    INSERT INTO seller_stores (seller_id, store_created_date, created_at)
+    SELECT u.id, u.created_at, NOW()
+    FROM users u WHERE u.id = ?
   `;
   db.query(query, [data.seller_id], (err, result) => {
     if (err) return callback(err);
@@ -151,7 +152,7 @@ exports.getStoreBySlug = (slug, callback) => {
       ss.store_link,
       ss.slug,
       ss.description,
-      ss.store_created_date,
+      COALESCE(ss.store_created_date, s.created_at, ss.created_at) AS store_created_date,
       ss.business_number,
       ss.store_image,
       s.first_name,
@@ -232,7 +233,7 @@ exports.getStoreDetails = (store_username, callback) => {
 
       p.*,
 
-      ss.store_created_date,
+      COALESCE(ss.store_created_date, u.created_at, ss.created_at) AS store_created_date,
       ss.description AS store_description,
       ss.store_name,
       ss.store_image,
@@ -245,6 +246,10 @@ exports.getStoreDetails = (store_username, callback) => {
       COALESCE(sr.positive_rating_percentage, 0) AS seller_positive_rating_percentage
 
     FROM products p
+
+    -- Seller user details
+    LEFT JOIN users u
+      ON u.id = p.seller_id
 
     -- Product category (can be sub or main)
     LEFT JOIN product_categories pc 

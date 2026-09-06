@@ -260,7 +260,7 @@ exports.getAllSellersForAdmin = (callback) => {
         ss.seller_id AS store_id,
         ss.store_link,
         ss.description,
-        ss.store_created_date,
+        COALESCE(ss.store_created_date, u.created_at, ss.created_at) AS store_created_date,
         ss.business_number,
         ss.store_image,
         bd.bank_name,
