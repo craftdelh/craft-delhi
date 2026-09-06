@@ -201,12 +201,13 @@ exports.updateOrderStatusOnly = async (order_id, order_status, res) => {
           if (!fetchErr && orderInfo) {
             const statusNames = { 0: 'Pending', 1: 'Confirmed', 2: 'Shipped', 3: 'Delivered', 4: 'Cancelled' };
             const statusLabel = statusNames[order_status] || 'Updated';
+            const publicOrderId = orderInfo.order_uid || order_id;
 
             if (orderInfo.user_id) {
               sendNotification({
                 userId: orderInfo.user_id,
                 title: `Order Status: ${statusLabel}`,
-                message: `Your order status has been updated to ${statusLabel}.`,
+                message: `Your order #${publicOrderId} status has been updated to ${statusLabel}.`,
                 type: 'ORDER_STATUS',
                 referenceId: order_id
               }).catch(e => console.error("Buyer Status Notification Error:", e));
@@ -215,7 +216,7 @@ exports.updateOrderStatusOnly = async (order_id, order_status, res) => {
               sendNotification({
                 userId: orderInfo.seller_id,
                 title: `Order Status: ${statusLabel}`,
-                message: `Order #${order_id} status updated to ${statusLabel}.`,
+                message: `Order #${publicOrderId} status updated to ${statusLabel}.`,
                 type: 'ORDER_STATUS',
                 referenceId: order_id
               }).catch(e => console.error("Seller Status Notification Error:", e));
@@ -358,11 +359,12 @@ exports.markOrderAsCancelled = async (order_id, order_status, cancel_reason, res
       if (result.affectedRows > 0) {
         Order.getOrderByIDforVerification(order_id, (fetchErr, orderInfo) => {
           if (!fetchErr && orderInfo) {
+            const publicOrderId = orderInfo.order_uid || order_id;
             if (orderInfo.user_id) {
               sendNotification({
                 userId: orderInfo.user_id,
                 title: 'Order Cancelled',
-                message: `Your order #${order_id} was cancelled. Reason: ${cancel_reason}`,
+                message: `Your order #${publicOrderId} was cancelled. Reason: ${cancel_reason}`,
                 type: 'ORDER_CANCELLED',
                 referenceId: order_id
               }).catch(e => console.error("Buyer Cancel Notification Error:", e));
@@ -371,7 +373,7 @@ exports.markOrderAsCancelled = async (order_id, order_status, cancel_reason, res
               sendNotification({
                 userId: orderInfo.seller_id,
                 title: 'Order Cancelled',
-                message: `Order #${order_id} was cancelled. Reason: ${cancel_reason}`,
+                message: `Order #${publicOrderId} was cancelled. Reason: ${cancel_reason}`,
                 type: 'ORDER_CANCELLED',
                 referenceId: order_id
               }).catch(e => console.error("Seller Cancel Notification Error:", e));

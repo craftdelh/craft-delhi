@@ -14,6 +14,7 @@ exports.createOrder = (userId, data, callback) => {
     shipping_address_id,
     seller_id,
     buyer_note,
+    items = [],
   } = data;
 
   const status = Number(order_status);
@@ -50,6 +51,152 @@ exports.createOrder = (userId, data, callback) => {
       );
     }
   );
+};
+
+// Create a paid custom/quotation order exactly once for a Razorpay payment.
+// A MySQL advisory lock keeps simultaneous verification callbacks from creating
+// duplicate order rows even when the payments table has no unique index yet.
+exports.createPaidOrderIdempotently = (userId, data, callback) => {
+  const {
+    order_uid,
+    total_amount,
+    order_status,
+    payment_status,
+    payment_type,
+    payment_method,
+    payment_uid,
+    razorpay_order_id,
+    shipping_address_id,
+    seller_id,
+    buyer_note,
+  } = data;
+
+  const lockName = `craftdelhi:payment:${payment_uid}`.slice(0, 64);
+
+  db.getConnection((connectionError, connection) => {
+    if (connectionError) return callback(connectionError, null);
+
+    let finished = false;
+    const finish = (error, result) => {
+      if (finished) return;
+      finished = true;
+      connection.query('SELECT RELEASE_LOCK(?)', [lockName], () => {
+        connection.release();
+        callback(error, result);
+      });
+    };
+
+    const rollback = (error) => {
+      connection.rollback(() => finish(error, null));
+    };
+
+    connection.query('SELECT GET_LOCK(?, 10) AS acquired', [lockName], (lockError, lockRows) => {
+      if (lockError) return finish(lockError, null);
+      if (Number(lockRows?.[0]?.acquired) !== 1) {
+        return finish(new Error('Could not acquire payment verification lock'), null);
+      }
+
+      connection.beginTransaction((transactionError) => {
+        if (transactionError) return finish(transactionError, null);
+
+        const existingSql = `
+          SELECT p.order_id, od.order_uid, od.total_amount, od.seller_id
+          FROM payments p
+          JOIN order_details od ON od.id = p.order_id
+          WHERE p.payment_uid = ? OR p.razorpay_order_id = ?
+          LIMIT 1
+        `;
+
+        connection.query(existingSql, [payment_uid, razorpay_order_id], (lookupError, rows) => {
+          if (lookupError) return rollback(lookupError);
+
+          if (rows.length) {
+            return connection.commit((commitError) => {
+              if (commitError) return rollback(commitError);
+              finish(null, {
+                order_id: rows[0].order_id,
+                order_uid: rows[0].order_uid,
+                existing: true,
+              });
+            });
+          }
+
+          const orderQuery = `
+            INSERT INTO order_details
+              (order_uid, user_id, total_amount, order_status, shipping_address_id, seller_id, buyer_note)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `;
+
+          connection.query(
+            orderQuery,
+            [
+              order_uid,
+              userId,
+              total_amount,
+              Number(order_status),
+              shipping_address_id,
+              seller_id,
+              buyer_note,
+            ],
+            (orderError, orderResult) => {
+              if (orderError) return rollback(orderError);
+
+              const paymentQuery = `
+                INSERT INTO payments
+                  (order_id, payment_uid, razorpay_order_id, payment_type, payment_status, payment_method)
+                VALUES (?, ?, ?, ?, ?, ?)
+              `;
+
+              connection.query(
+                paymentQuery,
+                [
+                  orderResult.insertId,
+                  payment_uid,
+                  razorpay_order_id,
+                  payment_type,
+                  Number(payment_status),
+                  payment_method,
+                ],
+                (paymentError) => {
+                  if (paymentError) return rollback(paymentError);
+
+                  const commitOrder = () => connection.commit((commitError) => {
+                    if (commitError) return rollback(commitError);
+                    finish(null, {
+                      order_id: orderResult.insertId,
+                      order_uid,
+                      existing: false,
+                    });
+                  });
+
+                  if (!Array.isArray(items) || items.length === 0) {
+                    return commitOrder();
+                  }
+
+                  const itemValues = items.map(item => [
+                    orderResult.insertId,
+                    item.product_id,
+                    item.quantity,
+                    item.price,
+                    Number(item.quantity) * Number(item.price)
+                  ]);
+
+                  connection.query(
+                    `INSERT INTO order_items (order_id, product_id, quantity, price, subtotal) VALUES ?`,
+                    [itemValues],
+                    (itemError) => {
+                      if (itemError) return rollback(itemError);
+                      commitOrder();
+                    }
+                  );
+                }
+              );
+            }
+          );
+        });
+      });
+    });
+  });
 };
 
 // ✅ Insert multiple order items
@@ -132,6 +279,58 @@ exports.getOrderById = (orderId, userId, callback) => {
     };
 
     callback(null, order);
+  });
+};
+
+// Compact, display-ready data for the automatic order-chat summary.
+// The ownership check prevents one buyer's address from being exposed to
+// another account if an invalid order id is supplied.
+exports.getOrderChatSummary = (orderId, userId, callback) => {
+  const query = `
+    SELECT
+      od.id AS order_id,
+      od.order_uid,
+      od.total_amount,
+      od.buyer_note,
+      u.first_name,
+      u.last_name,
+      ua.street,
+      ua.city,
+      ua.state,
+      ua.country,
+      ua.postal_code,
+      oi.id AS item_id,
+      oi.quantity,
+      p.name AS product_name
+    FROM order_details od
+    LEFT JOIN users u ON u.id = od.user_id
+    LEFT JOIN user_addresses ua ON ua.id = od.shipping_address_id
+    LEFT JOIN order_items oi ON oi.order_id = od.id
+    LEFT JOIN products p ON p.id = oi.product_id
+    WHERE od.id = ? AND od.user_id = ?
+  `;
+
+  db.query(query, [orderId, userId], (error, rows) => {
+    if (error) return callback(error, null);
+    if (!rows.length) return callback(null, null);
+
+    const first = rows[0];
+    callback(null, {
+      orderId: first.order_id,
+      orderUid: first.order_uid,
+      buyer: `${first.first_name || ''} ${first.last_name || ''}`.trim() || 'Customer',
+      amount: Number(first.total_amount || 0),
+      address: [first.street, first.city, first.state, first.country, first.postal_code]
+        .filter(Boolean)
+        .join(' '),
+      buyerNote: first.buyer_note || '',
+      items: rows
+        .filter((row) => row.item_id)
+        .map((row) => ({
+          name: row.product_name || 'Custom item',
+          quantity: Number(row.quantity || 1)
+        }))
+    });
   });
 };
 
@@ -252,7 +451,7 @@ exports.getrecentOrdersbySellerID = (sellerId, callback) => {
 
 
 exports.getOrderByIDforVerification = (order_id, callback) => {
-  const sql = `SELECT id, seller_id, user_id FROM order_details WHERE id = ?`;
+  const sql = `SELECT id, order_uid, seller_id, user_id FROM order_details WHERE id = ?`;
   db.query(sql, [order_id], (err, results) => {
     if (err) return callback(err, null);
     callback(null, results[0] || null);

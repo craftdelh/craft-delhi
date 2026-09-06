@@ -434,9 +434,13 @@ exports.getAllOrdersForAdmin = (callback) => {
   const sql = `
     SELECT 
       -- Order Details
-      O.id AS order_id, O.order_uid, O.user_id, O.total_amount, 
-      O.order_status, pm.payment_status, pm.payment_type, O.shipping_address_id, 
+      O.id AS order_id, O.order_uid, O.user_id, O.seller_id, O.total_amount,
+      O.order_status, pm.id AS payment_id, pm.payment_uid, pm.payment_status,
+      pm.payment_type, pm.payment_method, O.shipping_address_id,
       O.created_at AS order_created_at,
+
+      -- Seller Details
+      COALESCE(NULLIF(ss.store_name, ''), TRIM(CONCAT(su.first_name, ' ', su.last_name))) AS seller_name,
 
       -- Order Items
       OI.id AS item_id, OI.product_id, OI.quantity, OI.price AS item_price,
@@ -453,6 +457,8 @@ exports.getAllOrdersForAdmin = (callback) => {
     LEFT JOIN payments pm ON pm.order_id = O.id
     LEFT JOIN products P ON P.id = OI.product_id
     LEFT JOIN user_addresses UA ON UA.id = O.shipping_address_id
+    LEFT JOIN users su ON su.id = O.seller_id
+    LEFT JOIN seller_stores ss ON ss.seller_id = O.seller_id
     ORDER BY O.created_at DESC
   `;
 
@@ -467,10 +473,15 @@ exports.getAllOrdersForAdmin = (callback) => {
           id: row.order_id,
           order_uid: row.order_uid,
           user_id: row.user_id,
+          seller_id: row.seller_id,
+          seller_name: row.seller_name,
           total_amount: row.total_amount,
           order_status: row.order_status,
+          payment_id: row.payment_id,
+          payment_uid: row.payment_uid,
           payment_status: row.payment_status,
           payment_type: row.payment_type,
+          payment_method: row.payment_method,
           shipping_address_id: row.shipping_address_id,
           created_at: row.order_created_at,
 
@@ -518,26 +529,65 @@ exports.getAllOrdersForAdmin = (callback) => {
 
 
 exports.updateOrderStatus = (order_id, updates, callback) => {
-  const fields = [];
-  const values = [];
+  db.getConnection((connectionError, connection) => {
+    if (connectionError) return callback(connectionError);
 
-  if (updates.order_status !== undefined) {
-    fields.push('order_status = ?');
-    values.push(updates.order_status);
-  }
+    const finish = (error, result) => {
+      connection.release();
+      callback(error, result);
+    };
 
-  if (updates.payment_status !== undefined) {
-    fields.push('payment_status = ?');
-    values.push(updates.payment_status);
-  }
+    const rollback = (error) => {
+      connection.rollback(() => finish(error));
+    };
 
-  // Add WHERE clause
-  values.push(order_id);
+    connection.beginTransaction((transactionError) => {
+      if (transactionError) return finish(transactionError);
 
-  const sql = `UPDATE order_details SET ${fields.join(', ')} WHERE id = ?`;
+      const operations = [];
 
-  db.query(sql, values, callback);
-}
+      if (updates.order_status !== undefined) {
+        operations.push((next) => {
+          connection.query(
+            'UPDATE order_details SET order_status = ? WHERE id = ?',
+            [Number(updates.order_status), order_id],
+            next
+          );
+        });
+      }
+
+      if (updates.payment_status !== undefined) {
+        operations.push((next) => {
+          connection.query(
+            'UPDATE payments SET payment_status = ? WHERE order_id = ?',
+            [Number(updates.payment_status), order_id],
+            next
+          );
+        });
+      }
+
+      if (!operations.length) {
+        return rollback(new Error('No valid order fields to update'));
+      }
+
+      let index = 0;
+      const runNext = (error) => {
+        if (error) return rollback(error);
+        if (index < operations.length) {
+          const operation = operations[index++];
+          return operation(runNext);
+        }
+
+        connection.commit((commitError) => {
+          if (commitError) return rollback(commitError);
+          finish(null, { affectedRows: 1 });
+        });
+      };
+
+      runNext();
+    });
+  });
+};
 
 exports.deleteOrderbyAdmin = (order_id, callback) => {
   // Step 1: Delete order items first

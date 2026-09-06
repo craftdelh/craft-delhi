@@ -597,14 +597,18 @@ exports.adminOrderStatusUpdate = async (req, res) => {
     return res.status(403).json({ success: false, message: 'Unauthorized' });
   }
 
-  const { order_status, order_id, payment_status } = req.body;
+  const {
+    order_status,
+    order_id,
+    payment_status
+  } = req.body;
 
   if (!order_id) {
     return res.status(400).json({ success: false, message: 'Order ID is required' });
   }
 
   // Validate order_status (if provided)
-  if (order_status !== undefined && ![0, 1, 2, 3, 4].includes(order_status)) {
+  if (order_status !== undefined && ![0, 1, 2, 3, 4].includes(Number(order_status))) {
     return res.status(400).json({
       success: false,
       message: 'Invalid order_status. Use 0=Pending, 1=Accepted, 2=Out for Delivery, 3=Delivered, 4=Cancelled'
@@ -612,10 +616,10 @@ exports.adminOrderStatusUpdate = async (req, res) => {
   }
 
   // Validate payment_status (if provided)
-  if (payment_status !== undefined && ![0, 1, 2].includes(payment_status)) {
+  if (payment_status !== undefined && ![0, 1, 2, 4].includes(Number(payment_status))) {
     return res.status(400).json({
       success: false,
-      message: 'Invalid payment_status. Use 0=Pending, 1=Paid, 2=Refund'
+      message: 'Invalid payment_status. Use 0=Pending, 1=Paid, 2=Refund, 4=Cancelled'
     });
   }
 
@@ -636,7 +640,10 @@ exports.adminOrderStatusUpdate = async (req, res) => {
   }
 
   // Update
-  adminModel.updateOrderStatus(order_id, { order_status, payment_status }, (err, result) => {
+  adminModel.updateOrderStatus(order_id, {
+    order_status,
+    payment_status
+  }, (err, result) => {
     if (err) {
       return res.status(500).json({ success: false, message: 'Failed to update order status', error: err });
     }
@@ -1031,5 +1038,3 @@ exports.getAdminSettlements = (req, res) => {
     });
   });
 };
-
-
