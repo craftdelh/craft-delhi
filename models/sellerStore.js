@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const slugify = require('slugify');
+const { formatImageSizes } = require('../utils/imageFormatter');
 
 // ---------------- Callback-style Methods ---------------- //
 
@@ -320,7 +321,7 @@ exports.getStoreDetails = (store_username, callback) => {
         storesMap.set(row.seller_id, {
           store_id: row.seller_id,
           store_name: row.store_name,
-          store_image: row.store_image,
+          store_image: formatImageSizes(row.store_image),
           store_description: row.store_description,
           store_created_date: row.store_created_date,
           positive_rating_percentage: row.seller_positive_rating_percentage

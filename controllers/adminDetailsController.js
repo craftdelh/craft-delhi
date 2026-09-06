@@ -357,19 +357,19 @@ exports.updateSellerbyAdmin = (req, res) => {
       // Handle profile_image
       if (req.files?.profile_image?.[0]) {
         if (sellerImages.profile_image) {
-          const oldKey = getS3KeyFromUrl(sellerImages.profile_image);
-          if (oldKey) await deleteFilesFromS3([oldKey], process.env.AWS_BUCKET_NAME);
+          await deleteFilesFromS3([sellerImages.profile_image], process.env.AWS_BUCKET_NAME);
         }
-        profile_image_url = await uploadToS3(req.files.profile_image[0], 'profile_images');
+        const uploadedProfile = await uploadToS3(req.files.profile_image[0], 'profile_images');
+        profile_image_url = typeof uploadedProfile === 'object' ? JSON.stringify(uploadedProfile) : uploadedProfile;
       }
 
       // Handle store_image
       if (req.files?.store_image?.[0]) {
         if (sellerImages.store_image) {
-          const oldKey = getS3KeyFromUrl(sellerImages.store_image);
-          if (oldKey) await deleteFilesFromS3([oldKey], process.env.AWS_BUCKET_NAME);
+          await deleteFilesFromS3([sellerImages.store_image], process.env.AWS_BUCKET_NAME);
         }
-        store_image_url = await uploadToS3(req.files.store_image[0], 'store_images');
+        const uploadedStore = await uploadToS3(req.files.store_image[0], 'store_images');
+        store_image_url = typeof uploadedStore === 'object' ? JSON.stringify(uploadedStore) : uploadedStore;
       }
 
       // Build updateData dynamically
@@ -747,7 +747,8 @@ exports.createBanner = async (req, res) => {
     const file = req.files.banner[0];
 
     // Upload to S3
-    const bannerUrl = await uploadToS3(file, "banner");
+    const uploadedBanner = await uploadToS3(file, "banner");
+    const bannerUrl = typeof uploadedBanner === 'object' ? JSON.stringify(uploadedBanner) : uploadedBanner;
 
     const bannerData = {
       title,
@@ -827,7 +828,8 @@ exports.updateBanner = async (req, res) => {
             console.error("S3 delete error:", err);
           }
         }
-        bannerUrl = await uploadToS3(file, "banner");
+        const uploadedBanner = await uploadToS3(file, "banner");
+        bannerUrl = typeof uploadedBanner === 'object' ? JSON.stringify(uploadedBanner) : uploadedBanner;
       }
       const updateData = {
         title,

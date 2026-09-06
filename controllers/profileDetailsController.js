@@ -2,6 +2,7 @@ const profileDetails = require('../models/profileDetails');
 const authorizeAction = require('../utils/authorizeAction');
 const { uploadToS3, getS3KeyFromUrl } = require('../utils/s3Uploader');
 const { deleteFilesFromS3 } = require('../utils/deleteFilesFromS3');
+const { formatImageSizes } = require('../utils/imageFormatter');
 const bucketName = process.env.AWS_BUCKET_NAME;
 
 exports.updateProfile = async (req, res) => {
@@ -53,11 +54,11 @@ exports.updateProfile = async (req, res) => {
           // Handle profile image upload
           if (req.file) {
             if (existingUser.profile_image) {
-              const oldKey = getS3KeyFromUrl(existingUser.profile_image);
-              if (oldKey) await deleteFilesFromS3([oldKey], bucketName);
+              await deleteFilesFromS3([existingUser.profile_image], bucketName);
             }
 
-            profile_image = await uploadToS3(req.file, 'profile_image');
+            const uploadedImage = await uploadToS3(req.file, 'profile_image');
+            profile_image = typeof uploadedImage === 'object' ? JSON.stringify(uploadedImage) : uploadedImage;
           }
 
           // Prepare data for update
@@ -96,6 +97,10 @@ exports.updateProfile = async (req, res) => {
                   status: false,
                   message: 'Profile updated, but failed to retrieve updated data.'
                 });
+              }
+
+              if (updatedProfile) {
+                updatedProfile.profile_image = formatImageSizes(updatedProfile.profile_image);
               }
 
               return res.status(200).json({
@@ -361,11 +366,11 @@ exports.updateUserProfile = async (req, res) => {
           // Handle profile image upload
           if (req.file) {
             if (existingUserDetails.profile_image) {
-              const oldKey = getS3KeyFromUrl(existingUserDetails.profile_image);
-              if (oldKey) await deleteFilesFromS3([oldKey], bucketName);
+              await deleteFilesFromS3([existingUserDetails.profile_image], bucketName);
             }
 
-            profile_image = await uploadToS3(req.file, 'profile_image');
+            const uploadedImage = await uploadToS3(req.file, 'profile_image');
+            profile_image = typeof uploadedImage === 'object' ? JSON.stringify(uploadedImage) : uploadedImage;
           }
 
           // Prepare data for update

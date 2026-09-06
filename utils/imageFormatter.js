@@ -8,6 +8,7 @@ const formatImageSizes = (img) => {
   if (typeof img === 'object' && !Array.isArray(img)) return img;
   if (typeof img === 'string') {
     const trimmed = img.trim();
+    if (trimmed === '[object Object]') return null;
     if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
       try {
         return JSON.parse(trimmed);

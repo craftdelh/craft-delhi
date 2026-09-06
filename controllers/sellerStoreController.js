@@ -2,6 +2,7 @@ const SellerStore = require('../models/sellerStore');
 const authorizeAction = require('../utils/authorizeAction');
 const { uploadToS3, getS3KeyFromUrl } = require('../utils/s3Uploader');
 const { deleteFilesFromS3 } = require('../utils/deleteFilesFromS3');
+const { formatImageSizes } = require('../utils/imageFormatter');
 const bucketName = process.env.AWS_BUCKET_NAME;
 
 exports.updateStore = async (req, res) => {
@@ -58,11 +59,11 @@ exports.updateStore = async (req, res) => {
         try {
           if (req.file) {
             if (existingStore.store_image) {
-              const oldKey = getS3KeyFromUrl(existingStore.store_image);
-              if (oldKey) await deleteFilesFromS3([oldKey], bucketName);
+              await deleteFilesFromS3([existingStore.store_image], bucketName);
             }
 
-            store_image = await uploadToS3(req.file, 'store_image');
+            const uploadedImage = await uploadToS3(req.file, 'store_image');
+            store_image = typeof uploadedImage === 'object' ? JSON.stringify(uploadedImage) : uploadedImage;
           }
 
           const updateData = {
@@ -89,6 +90,10 @@ exports.updateStore = async (req, res) => {
             SellerStore.getStoreBySellerId(userId, (fetchErr, updatedStore) => {
               if (fetchErr) {
                 return res.status(500).json({ status: false, message: 'Store updated, but failed to retrieve updated data.' });
+              }
+
+              if (updatedStore) {
+                updatedStore.store_image = formatImageSizes(updatedStore.store_image);
               }
 
               return res.status(200).json({
@@ -129,6 +134,10 @@ exports.getStoreBySellerId = (req, res) => {
       return res.status(500).json({ status: false, message: 'Internal server error' });
     }
 
+    if (store) {
+      store.store_image = formatImageSizes(store.store_image);
+    }
+
     if (!store || !store.store_name) {
       return res.status(200).json({
         status: false,
@@ -161,6 +170,8 @@ exports.getStoreLinkBySellerId = (req, res) => {
       return res.status(404).json({ status: false, message: 'Store not found' });
     }
 
+    store.store_image = formatImageSizes(store.store_image);
+
     // The slug and store_link are already handled in the model
     res.json({
       status: true,
@@ -176,6 +187,8 @@ exports.getStoreBySlug = (req, res) => {
   SellerStore.getStoreBySlug(slug, (err, store) => {
     if (err) return res.status(500).json({ status: false, error: err });
     if (!store) return res.status(404).json({ status: false, message: 'Store not found' });
+
+    store.store_image = formatImageSizes(store.store_image);
 
     // Send store data (or render a view if using templating engine)
     res.json({ status: true, store });
