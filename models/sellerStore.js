@@ -92,7 +92,10 @@ exports.updateStoreBySellerId = (sellerId, data, callback) => {
   const values = [];
 
   for (let key in data) {
-    if (data[key] !== undefined) {
+    if (data[key] !== undefined && data[key] !== null) {
+      if (key === 'store_created_date' && typeof data[key] === 'string' && data[key].trim() === '') {
+        continue;
+      }
       fields.push(`${key} = ?`);
       values.push(data[key]);
     }
@@ -130,6 +133,16 @@ exports.findById = (id, callback) => {
 // Check if slug exists
 exports.isSlugExists = (slug, callback) => {
   db.query('SELECT id FROM seller_stores WHERE slug = ?', [slug], (err, results) => {
+    if (err) return callback(err, null);
+    return callback(null, results.length > 0);
+  });
+};
+
+// Check if store_username exists for another seller
+exports.checkUsernameExists = (username, currentSellerId, callback) => {
+  if (!username) return callback(null, false);
+  const query = 'SELECT id FROM seller_stores WHERE store_username = ? AND seller_id != ? LIMIT 1';
+  db.query(query, [username, currentSellerId], (err, results) => {
     if (err) return callback(err, null);
     return callback(null, results.length > 0);
   });

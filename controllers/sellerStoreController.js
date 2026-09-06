@@ -56,56 +56,82 @@ exports.updateStore = async (req, res) => {
           return res.status(authError.code).json({ status: false, message: authError.message });
         }
 
-        try {
-          if (req.file) {
-            if (existingStore.store_image) {
-              await deleteFilesFromS3([existingStore.store_image], bucketName);
-            }
-
-            const uploadedImage = await uploadToS3(req.file, 'store_image');
-            store_image = typeof uploadedImage === 'object' ? JSON.stringify(uploadedImage) : uploadedImage;
-          }
-
-          const updateData = {
-            store_name,
-            store_username,
-            store_link,
-            description,
-            store_created_date,
-            business_number
-          };
-
-          if (store_image) updateData.store_image = store_image;
-
-          SellerStore.updateStoreBySellerId(userId, updateData, (updateErr, result) => {
-            if (updateErr) {
-              console.error('MySQL error:', updateErr);
+        // Check if store_username is already taken by another seller
+        if (store_username && typeof store_username === 'string' && store_username.trim() !== '') {
+          SellerStore.checkUsernameExists(store_username.trim(), userId, async (checkErr, isTaken) => {
+            if (checkErr) {
+              console.error('MySQL error checking username:', checkErr);
               return res.status(500).json({ status: false, message: 'Internal server error' });
             }
 
-            if (result.affectedRows === 0) {
-              return res.status(404).json({ status: false, message: 'No changes provided.' });
+            if (isTaken) {
+              return res.status(400).json({ status: false, message: 'Store username is already taken. Please choose a different username.' });
             }
 
-            SellerStore.getStoreBySellerId(userId, (fetchErr, updatedStore) => {
-              if (fetchErr) {
-                return res.status(500).json({ status: false, message: 'Store updated, but failed to retrieve updated data.' });
+            await proceedWithUpdate();
+          });
+        } else {
+          await proceedWithUpdate();
+        }
+
+        async function proceedWithUpdate() {
+          try {
+            if (req.file) {
+              if (existingStore.store_image) {
+                await deleteFilesFromS3([existingStore.store_image], bucketName);
               }
 
-              if (updatedStore) {
-                updatedStore.store_image = formatImageSizes(updatedStore.store_image);
+              const uploadedImage = await uploadToS3(req.file, 'store_image');
+              store_image = typeof uploadedImage === 'object' ? JSON.stringify(uploadedImage) : uploadedImage;
+            }
+
+            const updateData = {
+              store_name,
+              store_username,
+              store_link,
+              description,
+              business_number
+            };
+
+            if (store_created_date && typeof store_created_date === 'string' && store_created_date.trim() !== '') {
+              updateData.store_created_date = store_created_date;
+            }
+
+            if (store_image) updateData.store_image = store_image;
+
+            SellerStore.updateStoreBySellerId(userId, updateData, (updateErr, result) => {
+              if (updateErr) {
+                if (updateErr.code === 'ER_DUP_ENTRY') {
+                  return res.status(400).json({ status: false, message: 'Store username is already taken. Please choose a different username.' });
+                }
+                console.error('MySQL error:', updateErr);
+                return res.status(500).json({ status: false, message: 'Internal server error' });
               }
 
-              return res.status(200).json({
-                status: true,
-                message: 'Store updated successfully.',
-                updated_store: updatedStore
+              if (result.affectedRows === 0) {
+                return res.status(404).json({ status: false, message: 'No changes provided.' });
+              }
+
+              SellerStore.getStoreBySellerId(userId, (fetchErr, updatedStore) => {
+                if (fetchErr) {
+                  return res.status(500).json({ status: false, message: 'Store updated, but failed to retrieve updated data.' });
+                }
+
+                if (updatedStore) {
+                  updatedStore.store_image = formatImageSizes(updatedStore.store_image);
+                }
+
+                return res.status(200).json({
+                  status: true,
+                  message: 'Store updated successfully.',
+                  updated_store: updatedStore
+                });
               });
             });
-          });
-        } catch (e) {
-          console.error('Unexpected error:', e);
-          return res.status(500).json({ status: false, message: 'Something went wrong' });
+          } catch (e) {
+            console.error('Unexpected error:', e);
+            return res.status(500).json({ status: false, message: 'Something went wrong' });
+          }
         }
       });
     });
