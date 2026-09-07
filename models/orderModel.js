@@ -69,6 +69,7 @@ exports.createPaidOrderIdempotently = (userId, data, callback) => {
     shipping_address_id,
     seller_id,
     buyer_note,
+    items = [],
   } = data;
 
   const lockName = `craftdelhi:payment:${payment_uid}`.slice(0, 64);
