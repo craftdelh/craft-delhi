@@ -365,7 +365,7 @@ exports.updateUserProfile = async (req, res) => {
         try {
           // Handle profile image upload
           if (req.file) {
-            if (existingUserDetails.profile_image) {
+            if (existingUserDetails?.profile_image) {
               await deleteFilesFromS3([existingUserDetails.profile_image], bucketName);
             }
 
@@ -373,10 +373,15 @@ exports.updateUserProfile = async (req, res) => {
             profile_image = typeof uploadedImage === 'object' ? JSON.stringify(uploadedImage) : uploadedImage;
           }
 
+          // Sanitize date_of_birth
+          const sanitizedDob = (date_of_birth && date_of_birth !== 'null' && date_of_birth !== 'undefined' && date_of_birth !== '') 
+            ? date_of_birth 
+            : null;
+
           // Prepare data for update
           const updateData = {
             phone_number,
-            date_of_birth,
+            date_of_birth: sanitizedDob,
             gender,
             email,
             first_name,
@@ -386,7 +391,9 @@ exports.updateUserProfile = async (req, res) => {
             postal_code,
             country,
             state,
-            address_id
+            address_id: (address_id && address_id !== 'undefined' && address_id !== 'null') 
+              ? address_id 
+              : (existingUserDetails?.addresses?.[0]?.id || null)
           };
 
           if (profile_image) {
@@ -396,8 +403,11 @@ exports.updateUserProfile = async (req, res) => {
           // Perform the update
           profileDetails.updateUserProfileDetails(userId, updateData, (updateErr, result) => {
             if (updateErr) {
-              console.error('MySQL update error:', updateErr);
-              return res.status(500).json({ status: false, message: 'Internal server error' });
+              console.error('MySQL update error in updateUserProfile:', updateErr);
+              return res.status(500).json({ 
+                status: false, 
+                message: updateErr.sqlMessage || updateErr.message || 'Internal server error' 
+              });
             }
 
             // ✅ Check if anything actually updated in either table

@@ -273,11 +273,17 @@ exports.updateUserProfileDetails = (userId, data, callback) => {
   const addressValues = [];
 
   for (let key in data) {
-    if (data[key] !== undefined) {
-      if (["phone_number", "date_of_birth", "gender", "first_name", "last_name", "email"].includes(key)) {
+    if (data[key] !== undefined && data[key] !== 'undefined') {
+      if (["phone_number", "gender", "first_name", "last_name", "email"].includes(key)) {
         userFields.push(`${key} = ?`);
         userValues.push(data[key]);
       } 
+      else if (key === "date_of_birth") {
+        if (data[key] !== null && data[key] !== '' && data[key] !== 'null') {
+          userFields.push(`${key} = ?`);
+          userValues.push(data[key]);
+        }
+      }
       else if (key === "profile_image") {
         detailFields.push(`${key} = ?`);
         detailValues.push(data[key]);
@@ -323,8 +329,10 @@ exports.updateUserProfileDetails = (userId, data, callback) => {
   const saveAddress = () => {
     if (!addressFields.length) return Promise.resolve();
 
+    const validAddressId = data.address_id && data.address_id !== 'undefined' && data.address_id !== 'null' ? Number(data.address_id) : null;
+
     // ✅ UPDATE EXISTING ADDRESS
-    if (data.address_id) {
+    if (validAddressId) {
       return new Promise((resolve, reject) => {
         db.query(
           `
@@ -332,7 +340,7 @@ exports.updateUserProfileDetails = (userId, data, callback) => {
           SET ${addressFields.join(", ")}, updated_at = NOW()
           WHERE id = ? AND user_id = ?
           `,
-          [...addressValues, Number(data.address_id), userId],
+          [...addressValues, validAddressId, userId],
           (err, res) => (err ? reject(err) : resolve(res))
         );
       });
