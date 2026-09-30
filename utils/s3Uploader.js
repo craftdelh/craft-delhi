@@ -27,7 +27,9 @@ const fieldMap = {
   product_video: { folder: 'product_video', prefix: 'vd' },
   product_reel: { folder: 'product_reel', prefix: 'rl' },
   store_image: { folder: 'store_image', prefix: 'si' },
+  store_images: { folder: 'store_image', prefix: 'si' },
   profile_image: { folder: 'profile_image', prefix: 'pi' },
+  profile_images: { folder: 'profile_image', prefix: 'pi' },
   banner: { folder: 'banner', prefix: 'ba' },
   gift_image: { folder: 'gift_image', prefix: 'gi' },
   category_image: { folder: 'category_image', prefix: 'ci' }
@@ -39,8 +41,6 @@ const uploadToS3 = async (file, fieldname) => {
   const timestamp = Date.now();
   const ext = path.extname(file.originalname) || '.jpg';
   const bucket = process.env.AWS_BUCKET_NAME;
-  const region = process.env.AWS_REGION;
-  const baseUrl = `https://${bucket}.s3.${region}.amazonaws.com`;
 
   // Check if file is an image
   if (file.mimetype && file.mimetype.startsWith('image/')) {
@@ -74,9 +74,9 @@ const uploadToS3 = async (file, fieldname) => {
     ]);
 
     return {
-      icon: `${baseUrl}/${iconKey}`,
-      thumbnail: `${baseUrl}/${thumbKey}`,
-      full: `${baseUrl}/${fullKey}`
+      icon: iconKey,
+      thumbnail: thumbKey,
+      full: fullKey
     };
   }
 
@@ -92,15 +92,25 @@ const uploadToS3 = async (file, fieldname) => {
   };
 
   await s3.send(new PutObjectCommand(params));
-  return `${baseUrl}/${key}`;
+  return key;
 };
 
 const getS3KeyFromUrl = (url) => {
   if (!url || typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) return trimmed;
   const bucket = process.env.AWS_BUCKET_NAME;
   const region = process.env.AWS_REGION;
   const prefix = `https://${bucket}.s3.${region}.amazonaws.com/`;
-  return url.startsWith(prefix) ? url.replace(prefix, '') : null;
+  if (trimmed.startsWith(prefix)) {
+    return trimmed.replace(prefix, '');
+  }
+  try {
+    const urlObj = new URL(trimmed);
+    return decodeURIComponent(urlObj.pathname).replace(/^\/+/, '');
+  } catch (e) {
+    return trimmed;
+  }
 };
 
 module.exports = { upload, uploadToS3, fieldMap, getS3KeyFromUrl };

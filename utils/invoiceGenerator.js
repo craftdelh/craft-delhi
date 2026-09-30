@@ -2,6 +2,7 @@ const PDFDocument = require('pdfkit');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const { getFullUrl } = require('./imageFormatter');
 
 // Helper to fetch image as Buffer
 function fetchImageBuffer(url) {
@@ -50,9 +51,10 @@ exports.generateInvoicePDF = async (order, res) => {
   // Pre-fetch all item images asynchronously
   const itemsWithImages = await Promise.all(
     order.items.map(async (item) => {
-      if (item.main_image_url && (item.main_image_url.startsWith('http://') || item.main_image_url.startsWith('https://'))) {
+      const fullUrl = getFullUrl(item.main_image_url);
+      if (fullUrl && (fullUrl.startsWith('http://') || fullUrl.startsWith('https://'))) {
         try {
-          const buffer = await fetchImageBuffer(item.main_image_url);
+          const buffer = await fetchImageBuffer(fullUrl);
           return { ...item, imageBuffer: buffer };
         } catch (e) {
           console.error(`Error fetching image for product ${item.product_name}:`, e.message);

@@ -6,6 +6,7 @@ const { deleteFilesFromS3 } = require('../utils/deleteFilesFromS3');
 const { checkPaymentProcessedForDelivery } = require('../utils/updateUtils');
 const sendEmail = require('../utils/mailHelper'); // adjust path as per your project
 const { sendNotification } = require('../utils/notificationHelper');
+const { getFullUrl, formatImageSizes, formatGalleryImages } = require('../utils/imageFormatter');
 
 exports.getDashboardStats = (req, res) => {
   const role = req.user.role;
@@ -47,7 +48,14 @@ exports.getTotalProducts = (req, res) => {
     }
     adminModel.getTotalProducts((err, stats) => {
       if (err) return res.status(500).json({ status: false, error: err });
-      res.json({ status: true, message: "Product fetched succesfully", data: stats });
+      const formatted = (stats || []).map(p => ({
+        ...p,
+        main_image_url: formatImageSizes(p.main_image_url),
+        gallery_images: formatGalleryImages(p.gallery_images),
+        video_url: getFullUrl(p.video_url),
+        reel_url: getFullUrl(p.reel_url)
+      }));
+      res.json({ status: true, message: "Product fetched succesfully", data: formatted });
     });
 };
 
@@ -62,7 +70,11 @@ exports.adminProductsView = (req, res) => {
     if (err) {
       return res.status(500).json({ success: false, message: 'Failed to fetch products', error: err });
     }
-    res.status(200).json({ success: true, data: result });
+    const formatted = (result || []).map(p => ({
+      ...p,
+      main_image_url: formatImageSizes(p.main_image_url)
+    }));
+    res.status(200).json({ success: true, data: formatted });
   });
 };
 
@@ -328,9 +340,14 @@ exports.adminSellersView = (req, res) => {
 
   adminModel.getAllSellersForAdmin((err, result) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Failed to fetch Buyers', error: err });
+      return res.status(500).json({ success: false, message: 'Failed to fetch Sellers', error: err });
     }
-    res.status(200).json({ success: true, data: result });
+    const formatted = (result || []).map(s => ({
+      ...s,
+      profile_image: formatImageSizes(s.profile_image),
+      store_image: formatImageSizes(s.store_image)
+    }));
+    res.status(200).json({ success: true, data: formatted });
   });
 };
 
@@ -357,7 +374,7 @@ exports.updateSellerbyAdmin = (req, res) => {
       // Handle profile_image
       if (req.files?.profile_image?.[0]) {
         if (sellerImages.profile_image) {
-          await deleteFilesFromS3([sellerImages.profile_image], process.env.AWS_BUCKET_NAME);
+          await deleteFilesFromS3([sellerImages.profile_image], process.env.craft-delhi-s3-storage);
         }
         const uploadedProfile = await uploadToS3(req.files.profile_image[0], 'profile_images');
         profile_image_url = typeof uploadedProfile === 'object' ? JSON.stringify(uploadedProfile) : uploadedProfile;
@@ -585,9 +602,22 @@ exports.adminOrdersView = (req, res) => {
 
   adminModel.getAllOrdersForAdmin((err, result) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Failed to fetch Buyers', error: err });
+      return res.status(500).json({ success: false, message: 'Failed to fetch Orders', error: err });
     }
-    res.status(200).json({ success: true, data: result });
+    const formatted = (result || []).map(order => ({
+      ...order,
+      items: (order.items || []).map(item => ({
+        ...item,
+        product: item.product ? {
+          ...item.product,
+          main_image_url: formatImageSizes(item.product.main_image_url),
+          gallery_images: formatGalleryImages(item.product.gallery_images),
+          video_url: getFullUrl(item.product.video_url),
+          reel_url: getFullUrl(item.product.reel_url)
+        } : null
+      }))
+    }));
+    res.status(200).json({ success: true, data: formatted });
   });
 };
 
@@ -897,9 +927,14 @@ exports.getBannerByID = (req, res) => {
       });
     }
 
+    const formatted = {
+      ...banner,
+      banner: banner.banner ? (typeof banner.banner === 'string' && banner.banner.trim().startsWith('{') ? formatImageSizes(banner.banner) : getFullUrl(banner.banner)) : null
+    };
+
     return res.status(200).json({
       success: true,
-      data: banner,
+      data: formatted,
     });
   });
 };
@@ -937,9 +972,14 @@ exports.getBanners = (req, res) => {
       });
     }
 
+    const formatted = (banners || []).map(b => ({
+      ...b,
+      banner: b.banner ? (typeof b.banner === 'string' && b.banner.trim().startsWith('{') ? formatImageSizes(b.banner) : getFullUrl(b.banner)) : null
+    }));
+
     return res.status(200).json({
       success: true,
-      data: banners,
+      data: formatted,
     });
   });
 };

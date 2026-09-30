@@ -4,7 +4,7 @@ const slugify = require('slugify');
 const { uploadToS3, getS3KeyFromUrl  } = require('../utils/s3Uploader');
 const authorizeAction = require('../utils/authorizeAction');
 const { deleteFilesFromS3 } = require('../utils/deleteFilesFromS3');
-const { formatImageSizes, formatGalleryImages } = require('../utils/imageFormatter');
+const { getFullUrl, formatImageSizes, formatGalleryImages } = require('../utils/imageFormatter');
 const { notifyAdminsNewProduct, notifyAdminsProductUpdated } = require('../utils/notificationHelper');
 const bucketName = process.env.AWS_BUCKET_NAME;
 
@@ -272,7 +272,9 @@ exports.getProducts = (req, res) => {
     const formatted = (products || []).map(p => ({
       ...p,
       main_image_url: formatImageSizes(p.main_image_url),
-      gallery_images: formatGalleryImages(p.gallery_images)
+      gallery_images: formatGalleryImages(p.gallery_images),
+      video_url: getFullUrl(p.video_url),
+      reel_url: getFullUrl(p.reel_url)
     }));
 
     return res.status(200).json({
@@ -304,7 +306,9 @@ exports.getProductsbySlug = (req, res) => {
     const formatted = {
       ...product,
       main_image_url: formatImageSizes(product.main_image_url),
-      gallery_images: formatGalleryImages(product.gallery_images)
+      gallery_images: formatGalleryImages(product.gallery_images),
+      video_url: getFullUrl(product.video_url),
+      reel_url: getFullUrl(product.reel_url)
     };
 
     return res.status(200).json({
@@ -335,7 +339,9 @@ exports.getProductRecommendations = (req, res) => {
     const formatted = (products || []).map(p => ({
       ...p,
       main_image_url: formatImageSizes(p.main_image_url),
-      gallery_images: formatGalleryImages(p.gallery_images)
+      gallery_images: formatGalleryImages(p.gallery_images),
+      video_url: getFullUrl(p.video_url),
+      reel_url: getFullUrl(p.reel_url)
     }));
 
     return res.status(200).json({

@@ -1,4 +1,5 @@
 const Search = require('../models/searchModel');
+const { getFullUrl, formatImageSizes, formatGalleryImages } = require('../utils/imageFormatter');
 
 exports.searchProducts = (req, res) => {
   const searchQuery = req.query.search;
@@ -21,10 +22,18 @@ exports.searchProducts = (req, res) => {
         });
       }
 
+      const formatted = (products || []).map(p => ({
+        ...p,
+        main_image_url: formatImageSizes(p.main_image_url),
+        gallery_images: formatGalleryImages(p.gallery_images),
+        video_url: getFullUrl(p.video_url),
+        reel_url: getFullUrl(p.reel_url)
+      }));
+
       return res.status(200).json({
         status: true,
         message: 'Products fetched successfully',
-        data: products
+        data: formatted
       });
     }
   );

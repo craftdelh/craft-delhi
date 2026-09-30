@@ -1,6 +1,6 @@
 const db = require('../config/db');
 const slugify = require('slugify');
-const { formatImageSizes } = require('../utils/imageFormatter');
+const { getFullUrl, formatImageSizes, formatGalleryImages } = require('../utils/imageFormatter');
 
 // ---------------- Callback-style Methods ---------------- //
 
@@ -342,7 +342,7 @@ exports.getStoreDetails = (store_username, callback) => {
           categoriesMap.set(row.w, {
             id: row.w,
             name: row.category_name,
-            image: row.category_image
+            image: formatImageSizes(row.category_image)
           });
         }
       }
@@ -374,8 +374,8 @@ exports.getStoreDetails = (store_username, callback) => {
           package_weight: row.package_weight,
           weight_type: row.weight_type,
           warranty_type: row.warranty_type,
-          main_image_url: row.main_image_url,
-          gallery_images: row.gallery_images,
+          main_image_url: formatImageSizes(row.main_image_url),
+          gallery_images: formatGalleryImages(row.gallery_images),
           category_id: row.category_id,
 
           total_review: row.total_review,
@@ -387,8 +387,14 @@ exports.getStoreDetails = (store_username, callback) => {
       }
 
       // Media
-      if (row.video_url) videos.add(row.video_url);
-      if (row.reel_url) reels.add(row.reel_url);
+      if (row.video_url) {
+        const fullVid = getFullUrl(row.video_url);
+        if (fullVid) videos.add(fullVid);
+      }
+      if (row.reel_url) {
+        const fullReel = getFullUrl(row.reel_url);
+        if (fullReel) reels.add(fullReel);
+      }
     });
 
     callback(null, {

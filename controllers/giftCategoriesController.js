@@ -2,6 +2,7 @@ const GiftCategories = require('../models/giftCategoriesModel');
 const { deleteFilesFromS3 } = require('../utils/deleteFilesFromS3');
 const bucketName = process.env.AWS_BUCKET_NAME;
 const { uploadToS3 } = require('../utils/s3Uploader');
+const { formatImageSizes } = require('../utils/imageFormatter');
 
 // ✅ Create Gift Category (Admin Only)
 exports.createGiftCategory = async (req, res) => {
@@ -92,10 +93,15 @@ exports.getAllGiftCategories = (req, res) => {
       });
     }
 
+    const formatted = (categories || []).map(cat => ({
+      ...cat,
+      gift_image: formatImageSizes(cat.gift_image)
+    }));
+
     return res.status(200).json({
       success: true,
-      total_records: categories.length,
-      data: categories
+      total_records: formatted.length,
+      data: formatted
     });
   });
 };
@@ -122,9 +128,15 @@ exports.getGiftCategoryById = (req, res) => {
       });
     }
 
+    const item = category[0];
+    const formatted = {
+      ...item,
+      gift_image: formatImageSizes(item.gift_image)
+    };
+
     return res.status(200).json({
       success: true,
-      data: category[0]
+      data: formatted
     });
   });
 };

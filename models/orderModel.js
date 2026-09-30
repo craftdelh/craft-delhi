@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const Payment = require('./paymentModel');
+const { formatImageSizes } = require('../utils/imageFormatter');
 // ✅ Create a new order
 exports.createOrder = (userId, data, callback) => {
   const {
@@ -603,7 +604,7 @@ exports.getOrdersbyUserID = (user_id, callback) => {
           item_id: row.item_id,
           product_id: row.product_id,
           product_sku: row.product_sku,
-          main_image_url: row.main_image_url,
+          main_image_url: formatImageSizes(row.main_image_url),
           product_name: row.product_name,
           quantity: row.quantity,
           price: row.price,
@@ -743,7 +744,7 @@ exports.getOrdersInvoiceById = (order_id, callback) => {
         ordersMap[row.order_id].items.push({
           item_id: row.item_id,
           product_id: row.product_id,
-          main_image_url: row.main_image_url,
+          main_image_url: formatImageSizes(row.main_image_url),
           product_name: row.product_name,
           quantity: row.quantity,
           price: row.price,
