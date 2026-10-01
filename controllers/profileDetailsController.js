@@ -136,6 +136,10 @@ exports.getProfileDetails = (req, res) => {
       return res.status(500).json({ status: false, message: 'Internal server error' });
     }
 
+    if (profile) {
+      profile.profile_image = formatImageSizes(profile.profile_image);
+    }
+
     if (!profile || (!profile.phone_number && !profile.home_address && !profile.office_address)) {
       return res.status(200).json({
         status: false,
@@ -305,6 +309,10 @@ exports.getUserProfileDetails = (req, res) => {
     if (err) {
       console.error('MySQL error:', err);
       return res.status(500).json({ status: false, message: 'Internal server error' });
+    }
+
+    if (profile) {
+      profile.profile_image = formatImageSizes(profile.profile_image);
     }
 
     if (!profile || (!profile.phone_number && !profile.city && !profile.street)) {

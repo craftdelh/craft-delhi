@@ -72,7 +72,10 @@ exports.adminProductsView = (req, res) => {
     }
     const formatted = (result || []).map(p => ({
       ...p,
-      main_image_url: formatImageSizes(p.main_image_url)
+      main_image_url: formatImageSizes(p.main_image_url),
+      gallery_images: formatGalleryImages(p.gallery_images),
+      video_url: getFullUrl(p.video_url),
+      reel_url: getFullUrl(p.reel_url)
     }));
     res.status(200).json({ success: true, data: formatted });
   });
@@ -954,6 +957,10 @@ exports.getAdminProfileDetails = (req, res) => {
         success: false,
         message: "Failed to fetch Details",
       });
+    }
+
+    if (Details && Details.profile_image) {
+      Details.profile_image = formatImageSizes(Details.profile_image);
     }
 
     return res.status(200).json({

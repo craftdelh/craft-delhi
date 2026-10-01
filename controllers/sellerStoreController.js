@@ -2,7 +2,7 @@ const SellerStore = require('../models/sellerStore');
 const authorizeAction = require('../utils/authorizeAction');
 const { uploadToS3, getS3KeyFromUrl } = require('../utils/s3Uploader');
 const { deleteFilesFromS3 } = require('../utils/deleteFilesFromS3');
-const { formatImageSizes } = require('../utils/imageFormatter');
+const { getFullUrl, formatImageSizes, formatGalleryImages } = require('../utils/imageFormatter');
 const bucketName = process.env.AWS_BUCKET_NAME;
 
 exports.updateStore = async (req, res) => {
@@ -274,7 +274,14 @@ exports.sellerProductsView = (req, res) => {
     if (err) {
       return res.status(500).json({ success: false, message: 'Failed to fetch products', error: err });
     }
-    res.status(200).json({ success: true, data: result });
+    const formatted = (result || []).map(p => ({
+      ...p,
+      main_image_url: formatImageSizes(p.main_image_url),
+      gallery_images: formatGalleryImages(p.gallery_images),
+      video_url: getFullUrl(p.video_url),
+      reel_url: getFullUrl(p.reel_url)
+    }));
+    res.status(200).json({ success: true, data: formatted });
   });
 };
 
@@ -290,7 +297,14 @@ exports.sellerProductsViewbyID = (req, res) => {
     if (err) {
       return res.status(500).json({ success: false, message: 'Failed to fetch products', error: err });
     }
-    res.status(200).json({ success: true, data: result });
+    const formatted = (result || []).map(p => ({
+      ...p,
+      main_image_url: formatImageSizes(p.main_image_url),
+      gallery_images: formatGalleryImages(p.gallery_images),
+      video_url: getFullUrl(p.video_url),
+      reel_url: getFullUrl(p.reel_url)
+    }));
+    res.status(200).json({ success: true, data: formatted });
   });
 };
 

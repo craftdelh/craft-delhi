@@ -3,7 +3,7 @@ const slugify = require('slugify');
 const authorizeAction = require('../utils/authorizeAction');
 const { uploadToS3 } = require('../utils/s3Uploader');
 const { deleteFilesFromS3 } = require('../utils/deleteFilesFromS3');
-const { formatImageSizes, formatGalleryImages } = require('../utils/imageFormatter');
+const { getFullUrl, formatImageSizes, formatGalleryImages } = require('../utils/imageFormatter');
 const bucketName = process.env.AWS_BUCKET_NAME;
 
 
@@ -631,7 +631,9 @@ exports.getProductsbyCatSubcatID = (req, res) => {
     const formatted = (data || []).map(p => ({
       ...p,
       main_image_url: formatImageSizes(p.main_image_url),
-      gallery_images: formatGalleryImages(p.gallery_images)
+      gallery_images: formatGalleryImages(p.gallery_images),
+      video_url: getFullUrl(p.video_url),
+      reel_url: getFullUrl(p.reel_url)
     }));
 
     res.status(200).json({

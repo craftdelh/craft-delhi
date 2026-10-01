@@ -1,5 +1,5 @@
 const Favourite = require('../models/favouriteModel');
-const { formatImageSizes, formatGalleryImages } = require('../utils/imageFormatter');
+const { getFullUrl, formatImageSizes, formatGalleryImages } = require('../utils/imageFormatter');
 
 // get all favourite
 exports.getFavourite = (req, res) => {
@@ -16,7 +16,9 @@ exports.getFavourite = (req, res) => {
     const formatted = (result || []).map(p => ({
       ...p,
       main_image_url: formatImageSizes(p.main_image_url),
-      gallery_images: formatGalleryImages(p.gallery_images)
+      gallery_images: formatGalleryImages(p.gallery_images),
+      video_url: getFullUrl(p.video_url),
+      reel_url: getFullUrl(p.reel_url)
     }));
     return res.status(200).json({ status: true, message: 'Favourite products fetched successfully', data: formatted });
   });

@@ -362,6 +362,7 @@ exports.getrecentOrdersbySellerID = (sellerId, callback) => {
       u.email,
       u.phone_number,
       p.name AS product_name,
+      p.main_image_url,
       ua.street,
       ua.city,
       ua.state,
@@ -438,6 +439,7 @@ exports.getrecentOrdersbySellerID = (sellerId, callback) => {
         ordersMap[row.order_id].items.push({
           item_id: row.item_id,
           product_id: row.product_id,
+          main_image_url: formatImageSizes(row.main_image_url),
           product_name: row.product_name,
           quantity: row.quantity,
           price: row.price,
