@@ -219,9 +219,9 @@ exports.addProduct = async (req, res) => {
       description,
       price: finalPrice, // 👈 use modified price here
       category_id: resolvedCatId,
-      stock,
+      stock: (stock === '' || stock === 'null') ? 0 : stock,
       dimension,
-      package_weight,
+      package_weight: (package_weight === '' || package_weight === 'null') ? 0 : package_weight,
       weight_type,
       warranty_type,
       main_image_url: mainImage,
@@ -422,8 +422,18 @@ async function handleProductUpdate(existingProduct, product_id, req, res) {
     const isSeller = req.user?.role !== parseInt(process.env.Admin_role_id);
 
     const updateData = {
-      name, description, price, category_id: resolvedCategoryId, stock,
-      dimension, package_weight, weight_type, warranty_type, video_name, reel_name, status
+      name, 
+      description, 
+      price, 
+      category_id: resolvedCategoryId, 
+      stock: (stock === '' || stock === 'null') ? 0 : stock,
+      dimension, 
+      package_weight: (package_weight === '' || package_weight === 'null') ? 0 : package_weight, 
+      weight_type, 
+      warranty_type, 
+      video_name, 
+      reel_name, 
+      status
     };
 
     // 🔒 If updated by a seller, reset admin_approval to 0 (requires admin re-approval)
