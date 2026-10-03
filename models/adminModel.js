@@ -84,10 +84,32 @@ exports.getTotalProducts = (callback) => {
   const sql = `
     SELECT 
         p.*, 
-        pc.name AS category_name
+        
+        CASE
+            WHEN pc.parent_id IS NULL THEN pc.name
+            ELSE parent.name
+        END AS category_name,
+
+        CASE
+            WHEN pc.parent_id IS NULL THEN NULL
+            ELSE pc.name
+        END AS subcat_name,
+
+        CASE
+            WHEN pc.parent_id IS NULL THEN pc.id
+            ELSE parent.id
+        END AS parent_category_id,
+
+        CASE
+            WHEN pc.parent_id IS NULL THEN NULL
+            ELSE pc.id
+        END AS subcategory_id
+
     FROM products p
     LEFT JOIN product_categories pc 
         ON pc.id = p.category_id
+    LEFT JOIN product_categories parent
+        ON parent.id = pc.parent_id
     ORDER BY p.created_at DESC;
   `;
 

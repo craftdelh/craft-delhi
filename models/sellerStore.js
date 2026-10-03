@@ -224,7 +224,17 @@ exports.getAllProductsForSeller = (seller_id, callback) => {
         CASE
             WHEN c.parent_id IS NULL THEN NULL
             ELSE c.name
-        END AS subcat_name
+        END AS subcat_name,
+
+        CASE
+            WHEN c.parent_id IS NULL THEN c.id
+            ELSE parent.id
+        END AS parent_category_id,
+
+        CASE
+            WHEN c.parent_id IS NULL THEN NULL
+            ELSE c.id
+        END AS subcategory_id
 
     FROM products p
 
@@ -243,8 +253,38 @@ exports.getAllProductsForSeller = (seller_id, callback) => {
 
 exports.getAllProductsForSellerbyID = (seller_id, product_id, callback) => {
   const sql = `
-    SELECT p.*
-    FROM products p where p.seller_id = ? and p.id = ?
+    SELECT 
+        p.*,
+
+        CASE
+            WHEN c.parent_id IS NULL THEN c.name
+            ELSE parent.name
+        END AS category_name,
+
+        CASE
+            WHEN c.parent_id IS NULL THEN NULL
+            ELSE c.name
+        END AS subcat_name,
+
+        CASE
+            WHEN c.parent_id IS NULL THEN c.id
+            ELSE parent.id
+        END AS parent_category_id,
+
+        CASE
+            WHEN c.parent_id IS NULL THEN NULL
+            ELSE c.id
+        END AS subcategory_id
+
+    FROM products p
+    
+    LEFT JOIN product_categories c
+        ON c.id = p.category_id
+
+    LEFT JOIN product_categories parent
+        ON parent.id = c.parent_id
+        
+    WHERE p.seller_id = ? AND p.id = ?
     ORDER BY p.created_at DESC
   `;
   db.query(sql, [seller_id, product_id], callback);
