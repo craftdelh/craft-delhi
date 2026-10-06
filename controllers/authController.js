@@ -38,7 +38,7 @@ exports.sendOtp = (req, res) => {
         const user = results[0];
 
         // ✅ Case 1: Fully registered user
-        if (user.is_email_verified && user.password) {
+        if (user.is_email_verified && user.password && user.first_name) {
           return res.status(400).json({
             status: false,
             message: 'Email already registered. Please login.'
@@ -181,7 +181,7 @@ exports.register = (req, res) => {
     if (roleNum === 3) {
 
       // Buyer already activated
-      if (userExists && user.password) {
+      if (userExists && user.password && user.first_name) {
         return res.status(400).json({
           status: false,
           message: 'Account already exists. Please login.'
@@ -248,7 +248,7 @@ exports.register = (req, res) => {
       }
 
       // Resume incomplete seller registration
-      if (!user.password && !user.first_name) {
+      if (!user.password || !user.first_name) {
         return userModel.updateUserDetails(
           {
             email,
@@ -442,7 +442,7 @@ exports.login = (req, res) => {
     if (!user.password || !user.first_name) {
       return res.status(400).json({
         status: false,
-        message: 'Registration not completed. Please finish signup.'
+        message: 'Registration is incomplete. Please register again with all details.'
       });
     }
     if (user.role !== 3 && user.user_approval === 0) {
